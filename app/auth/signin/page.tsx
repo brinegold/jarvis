@@ -16,7 +16,7 @@ export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [captchaCode] = useState('187823') // Simple captcha for demo
+  const [captchaCode] = useState(() => Math.floor(100000 + Math.random() * 900000).toString())
   const router = useRouter()
   const supabase = createSupabaseClient()
 
