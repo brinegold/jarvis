@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createSupabaseClient } from '@/lib/supabase'
@@ -11,7 +11,6 @@ export default function SignUpPage() {
   const [formData, setFormData] = useState({
     sponsorId: '',
     fullName: '',
-    country: '',
     mobileNo: '',
     email: '',
     password: '',
@@ -20,7 +19,19 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createSupabaseClient()
+
+  // Auto-fetch referral code from URL
+  useEffect(() => {
+    const refCode = searchParams.get('ref')
+    if (refCode) {
+      setFormData(prev => ({
+        ...prev,
+        sponsorId: refCode
+      }))
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +46,6 @@ export default function SignUpPage() {
         options: {
           data: {
             full_name: formData.fullName,
-            country: formData.country,
             mobile_no: formData.mobileNo,
             sponsor_id: formData.sponsorId,
           }
@@ -51,7 +61,6 @@ export default function SignUpPage() {
           .insert({
             id: authData.user.id,
             full_name: formData.fullName,
-            country: formData.country,
             mobile_no: formData.mobileNo,
             sponsor_id: formData.sponsorId || null,
           })
@@ -137,7 +146,11 @@ export default function SignUpPage() {
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter sponsor referral code (optional)"
+                readOnly={!!searchParams.get('ref')}
               />
+              {searchParams.get('ref') && (
+                <p className="text-green-400 text-sm mt-1">✓ Referral code automatically filled from URL</p>
+              )}
             </div>
 
             <div>
@@ -155,30 +168,6 @@ export default function SignUpPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-white text-sm font-medium mb-2">
-                Country
-              </label>
-              <select
-                name="country"
-                value={formData.country}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="" className="bg-gray-800">--Select--</option>
-                <option value="US" className="bg-gray-800">United States</option>
-                <option value="UK" className="bg-gray-800">United Kingdom</option>
-                <option value="CA" className="bg-gray-800">Canada</option>
-                <option value="AU" className="bg-gray-800">Australia</option>
-                <option value="DE" className="bg-gray-800">Germany</option>
-                <option value="FR" className="bg-gray-800">France</option>
-                <option value="IN" className="bg-gray-800">India</option>
-                <option value="PK" className="bg-gray-800">Pakistan</option>
-                <option value="BD" className="bg-gray-800">Bangladesh</option>
-                <option value="NG" className="bg-gray-800">Nigeria</option>
-              </select>
-            </div>
 
             <div>
               <label className="block text-white text-sm font-medium mb-2">
