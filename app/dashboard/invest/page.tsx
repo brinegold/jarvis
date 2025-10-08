@@ -16,7 +16,7 @@ export default function InvestPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [selectedPlan, setSelectedPlan] = useState<'A' | 'B' | 'C' | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<'A' | null>(null)
   const [amount, setAmount] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -25,31 +25,13 @@ export default function InvestPage() {
 
   const plans = {
     A: {
-      name: 'Plan A',
-      minAmount: 1,
-      maxAmount: 50,
-      dailyPercentage: 2,
-      tokensPerDollar: 1000,
-      icon: Star,
-      color: 'from-green-400 to-blue-500'
-    },
-    B: {
-      name: 'Plan B',
-      minAmount: 51,
-      maxAmount: 500,
-      dailyPercentage: 4,
-      tokensPerDollar: 200, // 10000 tokens for $50 minimum
-      icon: TrendingUp,
-      color: 'from-blue-400 to-purple-500'
-    },
-    C: {
-      name: 'Plan C',
-      minAmount: 501,
+      name: 'USDT Staking',
+      minAmount: 10,
       maxAmount: 50000,
       dailyPercentage: 5,
-      tokensPerDollar: 200, // 100000 tokens for $500 minimum
-      icon: Shield,
-      color: 'from-purple-400 to-pink-500'
+      tokensPerDollar: 100, // 1000 tokens for $10 minimum
+      icon: TrendingUp,
+      color: 'from-green-400 to-blue-500'
     }
   }
 
@@ -104,15 +86,8 @@ export default function InvestPage() {
     }
 
     try {
-      // Calculate coins earned
-      let coinsEarned = 0
-      if (selectedPlan === 'A') {
-        coinsEarned = 100
-      } else if (selectedPlan === 'B') {
-        coinsEarned = 1000
-      } else if (selectedPlan === 'C') {
-        coinsEarned = 10000
-      }
+      // Calculate coins earned - 100 JRC per $10 invested
+      const coinsEarned = Math.floor(investAmount / 10) * 100
 
       // Create investment plan
       const { data: investmentPlan, error: planError } = await supabase
@@ -243,7 +218,7 @@ export default function InvestPage() {
             return (
               <div
                 key={key}
-                onClick={() => setSelectedPlan(key as 'A' | 'B' | 'C')}
+                onClick={() => setSelectedPlan(key as 'A')}
                 className={`jarvis-card rounded-2xl p-6 cursor-pointer transition-all ${
                   isSelected ? 'ring-2 ring-blue-400 bg-white/20' : 'hover:bg-white/10'
                 }`}
@@ -261,7 +236,7 @@ export default function InvestPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-yellow-400 font-bold">
-                      {key === 'A' ? '100' : key === 'B' ? '1,000' : '10,000'} JRC
+                      100 JRC per $10
                     </p>
                     <p className="text-gray-400 text-sm">Coins</p>
                   </div>

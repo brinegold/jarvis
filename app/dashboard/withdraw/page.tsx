@@ -57,8 +57,8 @@ export default function WithdrawPage() {
 
     const withdrawAmount = parseFloat(amount)
     
-    if (withdrawAmount < 1) {
-      setError('Minimum withdrawal amount is $1')
+    if (withdrawAmount < 10) {
+      setError('Minimum withdrawal amount is $10')
       setIsSubmitting(false)
       return
     }
@@ -157,7 +157,7 @@ export default function WithdrawPage() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                min="1"
+                min="10"
                 step="0.01"
                 required
                 className="w-full px-4 py-4 bg-white/10 border border-white/20 rounded-lg text-white text-2xl text-center placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -235,7 +235,7 @@ export default function WithdrawPage() {
           <div className="jarvis-card rounded-xl p-4">
             <h3 className="text-white font-semibold mb-2">Withdrawal Information</h3>
             <ul className="text-gray-300 text-sm space-y-1">
-              <li>• Minimum withdrawal: $1.00</li>
+              <li>• Minimum withdrawal: $10.00</li>
               <li>• Withdrawal fee: 10% of withdrawal amount</li>
               <li>• Processing time: 24-48 hours</li>
               <li>• Only profits can be withdrawn</li>

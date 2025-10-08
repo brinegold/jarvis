@@ -193,7 +193,7 @@ export default function DepositPage() {
               <h4 className="text-white font-semibold mb-2">Fee Information</h4>
               <div className="text-sm text-gray-300 space-y-1">
                 <p>• Deposit Fee: 1% of deposit amount</p>
-                <p>• Minimum Deposit: $1.00 USDT</p>
+                <p>• Minimum Deposit: $10.00 USDT</p>
                 <p>• Network: BSC (Binance Smart Chain)</p>
                 <p>• Processing: Automatic after verification</p>
               </div>
@@ -225,7 +225,7 @@ export default function DepositPage() {
           <div className="jarvis-card rounded-xl p-4">
             <h3 className="text-white font-semibold mb-2">Deposit Information</h3>
             <ul className="text-gray-300 text-sm space-y-1">
-              <li>• Minimum deposit: $1.00</li>
+              <li>• Minimum deposit: $10.00</li>
               <li>• Deposit fee: 1% of deposit amount</li>
               <li>• Processing time: Instant</li>
               <li>• Supported currency: USDT (BEP20)</li>

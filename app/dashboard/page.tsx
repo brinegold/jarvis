@@ -381,7 +381,6 @@ export default function DashboardPage() {
                 priority
                 unoptimized={process.env.NODE_ENV === 'development'}
                 />
-                <span className="text-xl font-bold text-white">Jarvis Staking</span>
               </div>
 
             </div>
@@ -391,7 +390,7 @@ export default function DashboardPage() {
         {/* Staking Notice */}
         <div className="bg-blue-600/20 border border-blue-500 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 overflow-hidden">
           <div className="whitespace-nowrap animate-marquee">
-            <p className="text-white inline-block">Staking Started from 1 USDT: Earn 2% to 5% daily on USDT and JRC. Referral Commission up to 10 Levels</p>
+            <p className="text-white inline-block">Staking Started from 10 USDT: Earn 5% daily on USDT and JRC. Referral Commission up to 10 Levels</p>
           </div>
         </div>
 

@@ -53,7 +53,6 @@ export default function HomePage() {
               priority
               unoptimized={process.env.NODE_ENV === 'development'}
             />
-            <span className="text-2xl font-bold text-white">Jarvis Staking</span>
           </div>
           <div className="flex items-center space-x-4">
             <Link 
@@ -106,50 +105,22 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Investment Plans */}
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
-            <div className="jarvis-card rounded-2xl p-8 text-center">
-              <div className="bg-gradient-to-r from-green-400 to-blue-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Star className="h-8 w-8 text-white" />
+          {/* Investment Plan */}
+          <div className="flex justify-center mb-16">
+            <div className="jarvis-card rounded-2xl p-8 text-center border-2 border-green-400 max-w-md">
+              <div className="bg-gradient-to-r from-green-400 to-blue-500 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <TrendingUp className="h-10 w-10 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Plan A</h3>
-              <p className="text-gray-300 mb-4">$1 to $50</p>
-              <div className="text-3xl font-bold text-green-400 mb-2">2% Daily</div>
-              <p className="text-gray-300 mb-4">100 Jarvis Tokens</p>
+              <h3 className="text-3xl font-bold text-white mb-3">USDT Staking</h3>
+              <p className="text-gray-300 mb-4 text-lg">$10 to $50,000</p>
+              <div className="text-4xl font-bold text-green-400 mb-4">5% Daily</div>
+              <p className="text-gray-300 mb-4 text-lg">100 JRC per $10</p>
               <div className="text-sm text-gray-400">
                 Current: $0.1/token<br />
                 Future: $3/token
               </div>
-            </div>
-
-            <div className="jarvis-card rounded-2xl p-8 text-center border-2 border-blue-400">
-              <div className="bg-gradient-to-r from-blue-400 to-purple-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Plan B</h3>
-              <p className="text-gray-300 mb-4">$51 to $500</p>
-              <div className="text-3xl font-bold text-blue-400 mb-2">4% Daily</div>
-              <p className="text-gray-300 mb-4">1,000 Jarvis Tokens</p>
-              <div className="text-sm text-gray-400">
-                Current: $0.1/token<br />
-                Future: $3/token
-              </div>
-              <div className="absolute -top-2 -right-2 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                Popular
-              </div>
-            </div>
-
-            <div className="jarvis-card rounded-2xl p-8 text-center">
-              <div className="bg-gradient-to-r from-purple-400 to-pink-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Plan C</h3>
-              <p className="text-gray-300 mb-4">$501 to $50,000</p>
-              <div className="text-3xl font-bold text-purple-400 mb-2">5% Daily</div>
-              <p className="text-gray-300 mb-4">10,000 Jarvis Tokens</p>
-              <div className="text-sm text-gray-400">
-                Current: $0.1/token<br />
-                Future: $3/token
+              <div className="absolute -top-3 -right-3 bg-green-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                Best Plan
               </div>
             </div>
           </div>
