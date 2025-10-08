@@ -28,6 +28,12 @@ interface TransactionEmailData {
   errorMessage?: string
 }
 
+interface WelcomeEmailData {
+  userEmail: string
+  userName: string
+  referralCode?: string
+}
+
 class EmailService {
   private transporter: nodemailer.Transporter
 
@@ -390,6 +396,120 @@ class EmailService {
       transactionId,
       errorMessage
     })
+  }
+
+  private getWelcomeEmailTemplate(data: WelcomeEmailData): { subject: string; html: string } {
+    const { userName, referralCode } = data
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to Jarvis Staking Platform</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+          .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; margin: -20px -20px 20px -20px; }
+          .welcome-content { padding: 20px 0; }
+          .feature-box { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #667eea; }
+          .feature-title { font-weight: bold; color: #667eea; margin-bottom: 10px; }
+          .cta-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 20px 0; }
+          .referral-box { background: #e8f5e8; border: 2px solid #4caf50; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
+          .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px; }
+          .highlight { color: #667eea; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🚀 Welcome to Jarvis Staking!</h1>
+            <p>Your Gateway to Smart Cryptocurrency Staking</p>
+          </div>
+          
+          <div class="welcome-content">
+            <h2>Hello <span class="highlight">${userName}</span>! 👋</h2>
+            
+            <p>Welcome to the Jarvis Staking Platform! We're thrilled to have you join our community of smart investors who are earning passive income through our innovative staking solutions.</p>
+            
+            <div class="feature-box">
+              <div class="feature-title">🎯 USDT Staking Plan</div>
+              <p>Start earning <strong>5% daily returns</strong> with our flagship USDT staking plan. Minimum investment starts at just $10!</p>
+            </div>
+            
+            <div class="feature-box">
+              <div class="feature-title">🪙 JRC Rewards</div>
+              <p>Earn <strong>100 JRC tokens</strong> for every $10 you invest. These tokens can be staked for additional rewards!</p>
+            </div>
+            
+            <div class="feature-box">
+              <div class="feature-title">💰 Referral Program</div>
+              <p>Invite friends and earn commissions on their investments. Build your passive income network!</p>
+            </div>
+            
+            ${referralCode ? `
+            <div class="referral-box">
+              <h3>🎉 You joined through a referral!</h3>
+              <p>You're already part of our growing community network. Start investing to unlock additional benefits!</p>
+            </div>
+            ` : ''}
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://jarvisstaking.live'}/dashboard" class="cta-button">
+                🚀 Start Staking Now
+              </a>
+            </div>
+            
+            <div class="feature-box">
+              <div class="feature-title">📈 Next Steps</div>
+              <ol>
+                <li><strong>Complete your profile</strong> - Add any additional information</li>
+                <li><strong>Make your first deposit</strong> - Fund your account with USDT</li>
+                <li><strong>Choose your staking plan</strong> - Start earning daily returns</li>
+                <li><strong>Invite friends</strong> - Share your referral link and earn more</li>
+              </ol>
+            </div>
+            
+            <p>If you have any questions or need assistance, our support team is here to help. Simply reply to this email or contact us through the platform.</p>
+            
+            <p>Happy staking! 🎉</p>
+          </div>
+          
+          <div class="footer">
+            <p><strong>Jarvis Staking Platform</strong></p>
+            <p>Smart Staking • Passive Income • Secure Platform</p>
+            <p><small>This is an automated welcome message. For support, please contact us through the platform.</small></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    return {
+      subject: '🚀 Welcome to Jarvis Staking - Start Earning Today!',
+      html
+    }
+  }
+
+  async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
+    try {
+      const { subject, html } = this.getWelcomeEmailTemplate(data)
+
+      const mailOptions = {
+        from: `"Jarvis Staking Platform" <${process.env.SMTP_USER}>`,
+        to: data.userEmail,
+        subject,
+        html
+      }
+
+      const result = await this.transporter.sendMail(mailOptions)
+      console.log('Welcome email sent successfully:', result.messageId)
+      return true
+    } catch (error) {
+      console.error('Error sending welcome email:', error)
+      return false
+    }
   }
 }
 

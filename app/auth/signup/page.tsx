@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createSupabaseClient } from '@/lib/supabase'
+import EmailService from '@/lib/email-service'
 import { Eye, EyeOff, User } from 'lucide-react'
 
 export default function SignUpPage() {
@@ -77,6 +78,19 @@ export default function SignUpPage() {
           }
         }
 
+        // Send welcome email
+        try {
+          const emailService = new EmailService()
+          await emailService.sendWelcomeEmail({
+            userEmail: formData.email,
+            userName: formData.fullName,
+            referralCode: formData.sponsorId || undefined
+          })
+        } catch (emailError) {
+          console.error('Welcome email error:', emailError)
+          // Don't block registration if email fails
+        }
+
         router.push('/dashboard')
       }
     } catch (error: any) {
@@ -104,9 +118,9 @@ export default function SignUpPage() {
             <Image 
               src="/logo_300x300.png" 
               alt="Jarvis Staking Logo" 
-              width={80} 
-              height={80} 
-              className="h-20 w-20"
+              width={120} 
+              height={120} 
+              className="h-25 w-25"
               priority
               unoptimized={process.env.NODE_ENV === 'development'}
             />
