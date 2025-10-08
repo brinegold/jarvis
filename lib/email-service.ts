@@ -44,7 +44,7 @@ class EmailService {
       secure: process.env.SMTP_SECURE === 'true',
       auth: {
         user: process.env.SMTP_USER || 'admin@jarvisstaking.live',
-        pass: process.env.SMTP_PASS || ';,sb5@1BcUBZ'
+        pass: process.env.SMTP_PASS || 'a_f3l,w0O!KI'
       }
     }
 
