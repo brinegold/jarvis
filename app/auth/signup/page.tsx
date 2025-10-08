@@ -5,13 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createSupabaseClient } from '@/lib/supabase'
-import { Bot, Eye, EyeOff, User, Mail, Phone, Globe } from 'lucide-react'
+import { Eye, EyeOff, User } from 'lucide-react'
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
     sponsorId: '',
     fullName: '',
-    mobileNo: '',
     email: '',
     password: '',
   })
@@ -46,7 +45,6 @@ export default function SignUpPage() {
         options: {
           data: {
             full_name: formData.fullName,
-            mobile_no: formData.mobileNo,
             sponsor_id: formData.sponsorId,
           }
         }
@@ -61,7 +59,6 @@ export default function SignUpPage() {
           .insert({
             id: authData.user.id,
             full_name: formData.fullName,
-            mobile_no: formData.mobileNo,
             sponsor_id: formData.sponsorId || null,
           })
 
@@ -107,9 +104,9 @@ export default function SignUpPage() {
             <Image 
               src="/logo_300x300.png" 
               alt="Jarvis Staking Logo" 
-              width={48} 
-              height={48} 
-              className="h-12 w-12"
+              width={80} 
+              height={80} 
+              className="h-20 w-20"
               priority
               unoptimized={process.env.NODE_ENV === 'development'}
             />
@@ -166,27 +163,6 @@ export default function SignUpPage() {
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter your full name"
               />
-            </div>
-
-
-            <div>
-              <label className="block text-white text-sm font-medium mb-2">
-                Mobile No
-              </label>
-              <div className="flex">
-                <span className="inline-flex items-center px-3 py-3 bg-white/5 border border-white/20 border-r-0 rounded-l-lg text-white">
-                  📱
-                </span>
-                <input
-                  type="tel"
-                  name="mobileNo"
-                  value={formData.mobileNo}
-                  onChange={handleChange}
-                  required
-                  className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-r-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter mobile number"
-                />
-              </div>
             </div>
 
             <div>
