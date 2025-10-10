@@ -597,77 +597,82 @@ class EmailService {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Welcome to Jarvis Staking Platform</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-          .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; margin: -20px -20px 20px -20px; }
-          .welcome-content { padding: 20px 0; }
-          .feature-box { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #667eea; }
-          .feature-title { font-weight: bold; color: #667eea; margin-bottom: 10px; }
-          .cta-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 20px 0; }
-          .referral-box { background: #e8f5e8; border: 2px solid #4caf50; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
-          .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px; }
-          .highlight { color: #667eea; font-weight: bold; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+          .container { max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          .header { background: #1a1a1a; color: white; padding: 30px; text-align: center; }
+          .logo { max-width: 200px; width: 100%; height: auto; margin-bottom: 15px; }
+          .welcome-content { padding: 40px 30px; }
+          .header h1 { color: white; }
+          .feature-box { background: #f8f9fa; padding: 20px; margin: 20px 0; border-left: 3px solid #1a1a1a; }
+          .feature-title { font-weight: 600; color: #1a1a1a; margin-bottom: 10px; font-size: 16px; }
+          .cta-button { display: inline-block; background: #1a1a1a; color: white; padding: 12px 30px; text-decoration: none; font-weight: 500; margin: 20px 0; }
+          .referral-box { background: #f0f8f0; border: 1px solid #2e7d32; padding: 20px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 40px; padding: 20px; border-top: 1px solid #eee; color: #666; font-size: 13px; }
+          .highlight { color: #1a1a1a; font-weight: 600; }
+          h1, h2, h3 { color: #1a1a1a; margin-top: 0; }
+          p { margin-bottom: 15px; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>🚀 Welcome to Jarvis Staking!</h1>
-            <p>Your Gateway to Smart Cryptocurrency Staking</p>
+            <img src="https://www.jarvisstaking.live/_next/image?url=%2Flogo_300x300.png&w=128&q=75" alt="Jarvis Staking" class="logo">
+            <h1 style="color: white;">Welcome to Jarvis Staking Platform</h1>
+            <p>Professional Cryptocurrency Staking Solutions</p>
           </div>
           
           <div class="welcome-content">
-            <h2>Hello <span class="highlight">${userName}</span>! 👋</h2>
+            <h2>Dear <span class="highlight">${userName}</span>,</h2>
             
-            <p>Welcome to the Jarvis Staking Platform! We're thrilled to have you join our community of smart investors who are earning passive income through our innovative staking solutions.</p>
+            <p>Thank you for registering with Jarvis Staking Platform. We are pleased to welcome you to our professional staking ecosystem designed for sophisticated cryptocurrency investors.</p>
             
             <div class="feature-box">
-              <div class="feature-title">🎯 USDT Staking Plan</div>
-              <p>Start earning <strong>5% daily returns</strong> with our flagship USDT staking plan. Minimum investment starts at just $10!</p>
+              <div class="feature-title">USDT Staking Plan</div>
+              <p>Earn <strong>5% daily returns</strong> with our premium USDT staking plan. Minimum investment requirement: $10 USD.</p>
             </div>
             
             <div class="feature-box">
-              <div class="feature-title">🪙 JRC Rewards</div>
-              <p>Earn <strong>100 JRC tokens</strong> for every $10 you invest. These tokens can be staked for additional rewards!</p>
+              <div class="feature-title">JRC Token Rewards</div>
+              <p>Receive <strong>100 JRC tokens</strong> for every $10 invested. JRC tokens can be staked for additional yield generation.</p>
             </div>
             
             <div class="feature-box">
-              <div class="feature-title">💰 Referral Program</div>
-              <p>Invite friends and earn commissions on their investments. Build your passive income network!</p>
+              <div class="feature-title">Referral Program</div>
+              <p>Participate in our referral program to earn commissions on investments made by referred clients.</p>
             </div>
             
             ${referralCode ? `
             <div class="referral-box">
-              <h3>🎉 You joined through a referral!</h3>
-              <p>You're already part of our growing community network. Start investing to unlock additional benefits!</p>
+              <h3>Referral Registration Confirmed</h3>
+              <p>Your account has been successfully registered through our referral program. You are now eligible for enhanced program benefits upon initial investment.</p>
             </div>
             ` : ''}
             
             <div style="text-align: center; margin: 30px 0;">
               <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://jarvisstaking.live'}/dashboard" class="cta-button">
-                🚀 Start Staking Now
+                Access Your Dashboard
               </a>
             </div>
             
             <div class="feature-box">
-              <div class="feature-title">📈 Next Steps</div>
-              <ol>
-                <li><strong>Complete your profile</strong> - Add any additional information</li>
-                <li><strong>Make your first deposit</strong> - Fund your account with USDT</li>
-                <li><strong>Choose your staking plan</strong> - Start earning daily returns</li>
-                <li><strong>Invite friends</strong> - Share your referral link and earn more</li>
+              <div class="feature-title">Getting Started</div>
+              <ol style="margin: 0; padding-left: 20px;">
+                <li>Complete your profile information</li>
+                <li>Fund your account with USDT</li>
+                <li>Select your preferred staking plan</li>
+                <li>Begin earning daily returns</li>
               </ol>
             </div>
             
-            <p>If you have any questions or need assistance, our support team is here to help. Simply reply to this email or contact us through the platform.</p>
+            <p>Should you require assistance, our support team is available to address any inquiries. Please respond to this email or contact us through the platform interface.</p>
             
-            <p>Happy staking! 🎉</p>
+            <p>We look forward to serving your investment needs.</p>
+            <p><strong>Jarvis Staking Platform Management</strong></p>
           </div>
           
           <div class="footer">
-            <p><strong>Jarvis Staking Platform</strong></p>
-            <p>Smart Staking • Passive Income • Secure Platform</p>
-            <p><small>This is an automated welcome message. For support, please contact us through the platform.</small></p>
+            <p>© 2024 Jarvis Staking Platform. All rights reserved.</p>
+            <p>This email was sent to you because you recently registered on our platform.</p>
           </div>
         </div>
       </body>
@@ -675,7 +680,7 @@ class EmailService {
     `
 
     return {
-      subject: '🚀 Welcome to Jarvis Staking - Start Earning Today!',
+      subject: 'Welcome to Jarvis Staking Platform - Account Registration Confirmed',
       html
     }
   }
