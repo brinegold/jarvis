@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createSupabaseClient } from '@/lib/supabase'
-import EmailService from '@/lib/email-service'
 import { Eye, EyeOff, User } from 'lucide-react'
 
 export default function SignUpPage() {
@@ -80,20 +79,24 @@ export default function SignUpPage() {
 
         // Send welcome email
         try {
-          // Debug: Check environment variables
-          console.log('Environment check:', {
-            SMTP_HOST: process.env.SMTP_HOST,
-            SMTP_PORT: process.env.SMTP_PORT,
-            SMTP_USER: process.env.SMTP_USER,
-            hasPassword: !!process.env.SMTP_PASS
+          const response = await fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userEmail: formData.email,
+              userName: formData.fullName,
+              referralCode: formData.sponsorId || undefined
+            })
           })
-          
-          const emailService = new EmailService()
-          await emailService.sendWelcomeEmail({
-            userEmail: formData.email,
-            userName: formData.fullName,
-            referralCode: formData.sponsorId || undefined
-          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            console.error('Welcome email API error:', errorData)
+          } else {
+            console.log('Welcome email sent successfully')
+          }
         } catch (emailError) {
           console.error('Welcome email error:', emailError)
           // Don't block registration if email fails
