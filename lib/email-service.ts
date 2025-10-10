@@ -33,22 +33,41 @@ interface WelcomeEmailData {
   userName: string
   referralCode?: string
 }
-
 class EmailService {
   private transporter: nodemailer.Transporter
 
   constructor() {
     const emailConfig: EmailConfig = {
-      host: process.env.SMTP_HOST || 'server303.web-hosting.com',
-      port: parseInt(process.env.SMTP_PORT || '465'),
-      secure: process.env.SMTP_SECURE === 'true',
+      host: process.env.SMTP_HOST || 'mail.jarvisstaking.live',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true' || true, // Use true for port 465, false for 587
       auth: {
         user: process.env.SMTP_USER || 'admin@jarvisstaking.live',
-        pass: process.env.SMTP_PASS || 'a_f3l,w0O!KI'
+        pass: process.env.SMTP_PASS || 'Josephnetx01@@@@'
       }
     }
 
-    this.transporter = nodemailer.createTransport(emailConfig)
+    // Debug: Log the configuration (remove in production)
+    console.log('SMTP Config:', {
+      host: emailConfig.host,
+      port: emailConfig.port,
+      secure: emailConfig.secure,
+      user: emailConfig.auth.user,
+      hasPassword: !!emailConfig.auth.pass
+    })
+
+    // Add additional options for better compatibility
+    const transporterOptions = {
+      ...emailConfig,
+      connectionTimeout: 60000, // 60 seconds
+      greetingTimeout: 30000, // 30 seconds
+      socketTimeout: 60000, // 60 seconds
+      tls: {
+        rejectUnauthorized: false // Accept self-signed certificates
+      }
+    }
+
+    this.transporter = nodemailer.createTransport(transporterOptions)
   }
 
   private getEmailTemplate(data: TransactionEmailData): { subject: string; html: string } {
@@ -63,48 +82,210 @@ class EmailService {
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Jarvis Staking - Transaction Notification</title>
+        <title>Jarvis Staking Platform - Transaction Notification</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-          .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; margin: -20px -20px 20px -20px; }
-          .status-badge { display: inline-block; padding: 8px 16px; border-radius: 20px; color: white; font-weight: bold; margin: 10px 0; }
-          .transaction-details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .detail-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
-          .detail-label { font-weight: bold; color: #666; }
-          .detail-value { color: #333; }
-          .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px; }
-          .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 15px 0; }
-          .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 15px 0; }
-          .error { background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 15px 0; }
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+          }
+          .email-container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #e1e8ed;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+          }
+          .email-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: #ffffff;
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+          }
+          .email-header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: 0.5px;
+          }
+          .email-header h2 {
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            font-weight: 400;
+            opacity: 0.9;
+            letter-spacing: 0.3px;
+          }
+          .email-content {
+            padding: 40px 30px;
+            background: #ffffff;
+          }
+          .greeting {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #2c3e50;
+          }
+          .status-badge {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 4px;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 30px;
+          }
+          .status-success { background-color: #27ae60; }
+          .status-pending { background-color: #f39c12; }
+          .status-failed { background-color: #e74c3c; }
+          .transaction-summary {
+            background: #f8f9fa;
+            border: 1px solid #e1e8ed;
+            border-radius: 6px;
+            padding: 25px;
+            margin: 25px 0;
+          }
+          .summary-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+          }
+          .transaction-details {
+            background: #ffffff;
+            border: 1px solid #e1e8ed;
+            border-radius: 6px;
+            margin: 30px 0;
+          }
+          .details-header {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e1e8ed;
+            border-radius: 6px 6px 0 0;
+          }
+          .details-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+          }
+          .details-body {
+            padding: 20px;
+          }
+          .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f3f4;
+          }
+          .detail-row:last-child {
+            border-bottom: none;
+          }
+          .detail-label {
+            font-weight: 600;
+            color: #5a6c7d;
+            min-width: 140px;
+          }
+          .detail-value {
+            color: #2c3e50;
+            text-align: right;
+            font-weight: 500;
+          }
+          .additional-info {
+            background: #f8f9fa;
+            border: 1px solid #e1e8ed;
+            border-radius: 6px;
+            padding: 25px;
+            margin: 25px 0;
+          }
+          .additional-info h4 {
+            margin-top: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+          }
+          .additional-info ul {
+            margin: 15px 0;
+            padding-left: 20px;
+          }
+          .additional-info li {
+            margin: 8px 0;
+            color: #5a6c7d;
+          }
+          .email-footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e1e8ed;
+            font-size: 14px;
+            color: #7f8c8d;
+            line-height: 1.5;
+          }
+          .footer-text {
+            margin: 0 0 10px 0;
+          }
+          .footer-disclaimer {
+            font-size: 12px;
+            color: #95a5a6;
+            font-style: italic;
+          }
+          @media (max-width: 768px) {
+            .email-container {
+              margin: 10px;
+              border-radius: 4px;
+            }
+            .email-header {
+              padding: 30px 20px;
+            }
+            .email-content {
+              padding: 30px 20px;
+            }
+            .detail-row {
+              flex-direction: column;
+              gap: 5px;
+            }
+            .detail-value {
+              text-align: left;
+            }
+          }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <h1>🚀 Jarvis Staking Platform</h1>
+        <div class="email-container">
+          <div class="email-header">
+            <h1>Jarvis Staking Platform</h1>
             <h2>${this.getTransactionTitle(transactionType)} Notification</h2>
           </div>
-          
-          <p>Hello <strong>${userName}</strong>,</p>
-          
-          <div class="status-badge" style="background-color: ${statusColor};">
-            ${statusText.toUpperCase()}
-          </div>
-          
-          ${this.getTransactionContent(data)}
-          
-          <div class="transaction-details">
-            <h3>📋 Transaction Details</h3>
-            ${this.getTransactionDetailsHTML(data)}
-          </div>
-          
-          ${this.getAdditionalContent(data)}
-          
-          <div class="footer">
-            <p>Thank you for using Jarvis Staking Platform!</p>
-            <p>If you have any questions, please contact our support team.</p>
-            <p><small>This is an automated message. Please do not reply to this email.</small></p>
+
+          <div class="email-content">
+            <p class="greeting">Dear ${userName},</p>
+
+            <div class="status-badge status-${status}">
+              ${statusText}
+            </div>
+
+            ${this.getTransactionContent(data)}
+
+            <div class="transaction-details">
+              <div class="details-header">
+                <h3>Transaction Details</h3>
+              </div>
+              <div class="details-body">
+                ${this.getTransactionDetailsHTML(data)}
+              </div>
+            </div>
+
+            ${this.getAdditionalContent(data)}
+
+            <div class="email-footer">
+              <p class="footer-text">Thank you for choosing Jarvis Staking Platform.</p>
+              <p class="footer-text">Should you require any assistance, please contact our support team.</p>
+              <p class="footer-disclaimer">This is an automated message. Please do not reply to this email.</p>
+            </div>
           </div>
         </div>
       </body>
@@ -135,47 +316,54 @@ class EmailService {
       switch (transactionType) {
         case 'deposit':
           return `
-            <div class="success">
-              <p>✅ Your deposit of <strong>${amount} ${currency}</strong> has been successfully processed and added to your account.</p>
+            <div class="transaction-summary">
+              <div class="summary-title">Deposit Confirmation</div>
+              <p>Your deposit of <strong>${amount} ${currency}</strong> has been successfully processed and added to your account.</p>
             </div>
           `
         case 'withdrawal':
           return `
-            <div class="success">
-              <p>✅ Your withdrawal request of <strong>${amount} ${currency}</strong> has been successfully processed.</p>
+            <div class="transaction-summary">
+              <div class="summary-title">Withdrawal Confirmation</div>
+              <p>Your withdrawal request of <strong>${amount} ${currency}</strong> has been successfully processed.</p>
             </div>
           `
         case 'transfer':
           return `
-            <div class="success">
-              <p>✅ Your transfer of <strong>${amount} ${currency}</strong> has been completed successfully.</p>
+            <div class="transaction-summary">
+              <div class="summary-title">Transfer Confirmation</div>
+              <p>Your transfer of <strong>${amount} ${currency}</strong> has been completed successfully.</p>
             </div>
           `
         case 'staking':
           return `
-            <div class="success">
-              <p>✅ Your JRC staking of <strong>${amount} ${currency}</strong> has been activated successfully.</p>
+            <div class="transaction-summary">
+              <div class="summary-title">Staking Confirmation</div>
+              <p>Your staking transaction of <strong>${amount} ${currency}</strong> has been activated successfully.</p>
             </div>
           `
         case 'jrc_purchase':
           return `
-            <div class="success">
-              <p>✅ Your JRC token purchase of <strong>${amount} ${currency}</strong> has been completed successfully.</p>
+            <div class="transaction-summary">
+              <div class="summary-title">JRC Purchase Confirmation</div>
+              <p>Your JRC token purchase of <strong>${amount} ${currency}</strong> has been completed successfully.</p>
             </div>
           `
       }
     } else if (status === 'failed') {
       return `
-        <div class="error">
-          <p>❌ Your ${transactionType} request of <strong>${amount} ${currency}</strong> has failed.</p>
+        <div class="additional-info" style="border-left: 4px solid #e74c3c;">
+          <h4>Transaction Failed</h4>
+          <p>Your ${transactionType} request of <strong>${amount} ${currency}</strong> has failed.</p>
           ${data.errorMessage ? `<p><strong>Reason:</strong> ${data.errorMessage}</p>` : ''}
           <p>Please try again or contact support if the issue persists.</p>
         </div>
       `
     } else {
       return `
-        <div class="warning">
-          <p>⏳ Your ${transactionType} request of <strong>${amount} ${currency}</strong> is currently being processed.</p>
+        <div class="additional-info" style="border-left: 4px solid #f39c12;">
+          <h4>Transaction Processing</h4>
+          <p>Your ${transactionType} request of <strong>${amount} ${currency}</strong> is currently being processed.</p>
           <p>We will notify you once the transaction is completed.</p>
         </div>
       `
@@ -282,25 +470,25 @@ class EmailService {
   private getAdditionalContent(data: TransactionEmailData): string {
     if (data.transactionType === 'staking' && data.status === 'success') {
       return `
-        <div class="success">
-          <h3>🎯 Staking Information</h3>
-          <p>Your JRC tokens are now earning daily rewards!</p>
+        <div class="additional-info">
+          <h4>Staking Information</h4>
+          <p>Your staking positions are now earning rewards.</p>
           <ul>
             <li>Daily reward rate: <strong>${data.dailyPercentage}%</strong></li>
             <li>Staking period: <strong>${data.stakingPeriod} days</strong></li>
             <li>Expected total return: <strong>${((data.dailyPercentage || 0) * (data.stakingPeriod || 0)).toFixed(2)}%</strong></li>
           </ul>
-          <p>Rewards will be distributed daily to your account automatically.</p>
+          <p>Rewards will be distributed to your account automatically.</p>
         </div>
       `
     }
 
     if (data.transactionType === 'withdrawal' && data.status === 'success') {
       return `
-        <div class="success">
-          <h3>💰 Withdrawal Information</h3>
-          <p>Your withdrawal has been processed and sent to your specified wallet address.</p>
-          <p>Please allow some time for the transaction to be confirmed on the blockchain.</p>
+        <div class="additional-info">
+          <h4>Withdrawal Information</h4>
+          <p>Your withdrawal has been processed and transferred to your specified wallet address.</p>
+          <p>Please allow time for blockchain confirmation.</p>
         </div>
       `
     }

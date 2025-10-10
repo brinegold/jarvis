@@ -80,6 +80,14 @@ export default function SignUpPage() {
 
         // Send welcome email
         try {
+          // Debug: Check environment variables
+          console.log('Environment check:', {
+            SMTP_HOST: process.env.SMTP_HOST,
+            SMTP_PORT: process.env.SMTP_PORT,
+            SMTP_USER: process.env.SMTP_USER,
+            hasPassword: !!process.env.SMTP_PASS
+          })
+          
           const emailService = new EmailService()
           await emailService.sendWelcomeEmail({
             userEmail: formData.email,
