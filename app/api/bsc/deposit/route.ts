@@ -24,10 +24,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { txHash } = await request.json()
+    const { txHash, expectedAmount } = await request.json()
 
     if (!txHash) {
       return NextResponse.json({ error: 'Transaction hash is required' }, { status: 400 })
+    }
+
+    if (!expectedAmount || isNaN(parseFloat(expectedAmount))) {
+      return NextResponse.json({ error: 'Valid deposit amount is required' }, { status: 400 })
+    }
+
+    const expectedAmountNum = parseFloat(expectedAmount)
+    if (expectedAmountNum < 10) {
+      return NextResponse.json({ error: 'Minimum deposit amount is $10 USDT' }, { status: 400 })
+    }
+
+    if (expectedAmountNum > 50000) {
+      return NextResponse.json({ error: 'Maximum deposit amount is $50,000 USDT' }, { status: 400 })
     }
 
     // Get user profile
@@ -94,6 +107,16 @@ export async function POST(request: NextRequest) {
     // Use the actual transfer amount from blockchain
     const depositAmount = parseFloat(txDetails.usdtTransferAmount)
     
+    // Validate that the actual amount matches the expected amount (with 1% tolerance)
+    const tolerance = expectedAmountNum * 0.01
+    const amountDifference = Math.abs(depositAmount - expectedAmountNum)
+    
+    if (amountDifference > tolerance) {
+      return NextResponse.json({ 
+        error: `Transaction amount ($${depositAmount} USDT) does not match expected amount ($${expectedAmountNum} USDT). Please ensure you sent the correct amount.` 
+      }, { status: 400 })
+    }
+    
     // Calculate amounts (1% fee, 99% to user)
     const fee = depositAmount * 0.01
     const netAmount = depositAmount - fee
@@ -124,6 +147,22 @@ export async function POST(request: NextRequest) {
 
     console.log("Deposit completed successfully")
 
+    // Transfer USDT from user wallet to admin wallets
+    let adminTransferResults = {};
+    try {
+      console.log("Initiating USDT transfer to admin wallets...");
+      adminTransferResults = await bscService.transferToAdminWallets(
+        user.id,
+        depositAmount,
+        fee
+      );
+      console.log("USDT successfully transferred to admin wallets:", adminTransferResults);
+    } catch (transferError) {
+      console.error("Failed to transfer USDT to admin wallets:", transferError);
+      // Log the error but don't fail the deposit since user balance is already credited
+      // The admin can manually collect the USDT later if needed
+    }
+
     // Send success email notification
     try {
       const emailService = new EmailService()
@@ -148,7 +187,8 @@ export async function POST(request: NextRequest) {
       message: "Deposit processed successfully",
       amount: netAmount,
       fee: fee,
-      txHash: txHash
+      txHash: txHash,
+      adminTransfers: adminTransferResults
     })
 
   } catch (error: any) {

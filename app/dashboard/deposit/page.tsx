@@ -11,6 +11,7 @@ export default function DepositPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [txHash, setTxHash] = useState('')
+  const [depositAmount, setDepositAmount] = useState('')
   const [selectedCurrency, setSelectedCurrency] = useState('USDT.BEP20')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -18,6 +19,10 @@ export default function DepositPage() {
   const [walletInfo, setWalletInfo] = useState<any>(null)
   const [loadingWallet, setLoadingWallet] = useState(true)
   const supabase = createSupabaseClient()
+
+  // Deposit limits
+  const MIN_DEPOSIT = 10
+  const MAX_DEPOSIT = 50000
 
   useEffect(() => {
     if (!loading && !user) {
@@ -53,6 +58,31 @@ export default function DepositPage() {
     setError('')
     setSuccess('')
 
+    if (!depositAmount) {
+      setError('Please enter the deposit amount')
+      setIsSubmitting(false)
+      return
+    }
+
+    const amount = parseFloat(depositAmount)
+    if (isNaN(amount)) {
+      setError('Please enter a valid deposit amount')
+      setIsSubmitting(false)
+      return
+    }
+
+    if (amount < MIN_DEPOSIT) {
+      setError(`Minimum deposit amount is $${MIN_DEPOSIT} USDT`)
+      setIsSubmitting(false)
+      return
+    }
+
+    if (amount > MAX_DEPOSIT) {
+      setError(`Maximum deposit amount is $${MAX_DEPOSIT.toLocaleString()} USDT`)
+      setIsSubmitting(false)
+      return
+    }
+
     if (!txHash) {
       setError('Please enter the transaction hash')
       setIsSubmitting(false)
@@ -65,7 +95,7 @@ export default function DepositPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ txHash })
+        body: JSON.stringify({ txHash, expectedAmount: amount })
       })
 
       const data = await response.json()
@@ -73,6 +103,7 @@ export default function DepositPage() {
       if (response.ok) {
         setSuccess(`Deposit processed successfully! Amount: $${data.amount.toFixed(2)} (Fee: $${data.fee.toFixed(2)})`)
         setTxHash('')
+        setDepositAmount('')
         
         // Redirect to dashboard after 3 seconds
         setTimeout(() => {
@@ -174,6 +205,48 @@ export default function DepositPage() {
 
             <div>
               <label className="block text-white text-sm font-medium mb-2">
+                Deposit Amount (USDT)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  placeholder="Enter amount (10 - 50,000)"
+                  min={MIN_DEPOSIT}
+                  max={MAX_DEPOSIT}
+                  step="0.01"
+                  required
+                  className="w-full px-4 py-3 pl-12 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                  <DollarSign className="h-5 w-5 text-green-500" />
+                </div>
+              </div>
+              <p className="text-gray-400 text-sm mt-2">
+                Minimum: $10 USDT • Maximum: $50,000 USDT
+              </p>
+            </div>
+
+            {depositAmount && parseFloat(depositAmount) >= MIN_DEPOSIT && (
+              <div className="bg-green-600/20 border border-green-500 rounded-lg p-4">
+                <div className="flex justify-between text-sm text-white mb-2">
+                  <span>Deposit Amount:</span>
+                  <span>${depositAmount || '0.00'}</span>
+                </div>
+                <div className="flex justify-between text-sm text-white mb-2">
+                  <span>Deposit Fee (1%):</span>
+                  <span>${depositAmount ? (parseFloat(depositAmount) * 0.01).toFixed(2) : '0.00'}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold text-white border-t border-white/20 pt-2">
+                  <span>Net Amount (Credited):</span>
+                  <span>${depositAmount ? (parseFloat(depositAmount) * 0.99).toFixed(2) : '0.00'}</span>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">
                 Transaction Hash
               </label>
               <input
@@ -194,6 +267,7 @@ export default function DepositPage() {
               <div className="text-sm text-gray-300 space-y-1">
                 <p>• Deposit Fee: 1% of deposit amount</p>
                 <p>• Minimum Deposit: $10.00 USDT</p>
+                <p>• Maximum Deposit: $50,000.00 USDT</p>
                 <p>• Network: BSC (Binance Smart Chain)</p>
                 <p>• Processing: Automatic after verification</p>
               </div>
@@ -201,7 +275,7 @@ export default function DepositPage() {
 
             <button
               type="submit"
-              disabled={isSubmitting || !txHash}
+              disabled={isSubmitting || !txHash || !depositAmount}
               className="w-full jarvis-button py-4 rounded-lg text-white font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Verifying Transaction...' : 'VERIFY & PROCESS DEPOSIT'}
@@ -226,6 +300,7 @@ export default function DepositPage() {
             <h3 className="text-white font-semibold mb-2">Deposit Information</h3>
             <ul className="text-gray-300 text-sm space-y-1">
               <li>• Minimum deposit: $10.00</li>
+              <li>• Maximum deposit: $50,000.00</li>
               <li>• Deposit fee: 1% of deposit amount</li>
               <li>• Processing time: Instant</li>
               <li>• Supported currency: USDT (BEP20)</li>

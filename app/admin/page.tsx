@@ -13,7 +13,10 @@ import {
   XCircle,
   Eye,
   Settings,
-  LogOut
+  LogOut,
+  Coins,
+  Wallet,
+  Scan
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -46,6 +49,8 @@ export default function AdminDashboard() {
   const [pendingWithdrawals, setPendingWithdrawals] = useState<PendingWithdrawal[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isCollecting, setIsCollecting] = useState(false)
+  const [collectionResults, setCollectionResults] = useState<string>('')
   const supabase = createSupabaseClient()
 
   useEffect(() => {
@@ -154,6 +159,54 @@ export default function AdminDashboard() {
     } catch (error: any) {
       console.error('Error distributing profits:', error)
       alert(`❌ Failed to distribute profits: ${error.message}`)
+    }
+  }
+
+  const handleTokenCollection = async (action: 'scan_all' | 'collect_usdt' | 'collect_bnb', userId?: string) => {
+    setIsCollecting(true)
+    setCollectionResults('')
+    
+    try {
+      const response = await fetch('/api/admin/collect-tokens', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action, userId })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        if (action === 'scan_all' || action === 'collect_usdt' || action === 'collect_bnb') {
+          const results = data.results
+          const summary = `✅ ${data.message}\n\n` +
+            `📊 Scanned: ${results.scannedWallets} wallets\n` +
+            `💰 USDT Collections: ${results.usdtCollections.length}\n` +
+            `⛽ BNB Collections: ${results.bnbCollections.length}\n` +
+            `❌ Errors: ${results.errors.length}\n\n` +
+            (results.usdtCollections.length > 0 ? 
+              `USDT Collections:\n${results.usdtCollections.map((c: any) => 
+                `• ${c.amount} USDT - TX: ${c.txHash?.slice(0,10)}...`).join('\n')}\n\n` : '') +
+            (results.bnbCollections.length > 0 ? 
+              `BNB Collections:\n${results.bnbCollections.map((c: any) => 
+                `• ${c.amount} BNB - TX: ${c.txHash?.slice(0,10)}...`).join('\n')}\n\n` : '') +
+            (results.errors.length > 0 ? 
+              `Errors:\n${results.errors.slice(0,5).map((e: any) => 
+                `• ${e.error}`).join('\n')}` : '')
+          
+          setCollectionResults(summary)
+        } else {
+          setCollectionResults(`✅ ${data.message}\nTX: ${data.txHash}`)
+        }
+      } else {
+        setCollectionResults(`❌ Error: ${data.error}`)
+      }
+    } catch (error: any) {
+      console.error('Collection error:', error)
+      setCollectionResults(`❌ Failed: ${error.message}`)
+    } finally {
+      setIsCollecting(false)
     }
   }
 
@@ -324,6 +377,62 @@ export default function AdminDashboard() {
           >
             Distribute Profits
           </button>
+        </div>
+
+        {/* Token Collection Section */}
+        <div className="jarvis-card rounded-2xl p-6 mb-8">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+            <Wallet className="h-6 w-6" />
+            <span>Token Collection Management</span>
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <button
+              onClick={() => handleTokenCollection('scan_all')}
+              disabled={isCollecting}
+              className="jarvis-button py-4 px-6 rounded-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Scan className="h-5 w-5" />
+              <span>{isCollecting ? 'Scanning...' : 'Scan & Collect All'}</span>
+            </button>
+            
+            <button
+              onClick={() => handleTokenCollection('collect_usdt')}
+              disabled={isCollecting}
+              className="bg-green-600 hover:bg-green-700 text-white py-4 px-6 rounded-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Coins className="h-5 w-5" />
+              <span>{isCollecting ? 'Collecting...' : 'Collect All USDT'}</span>
+            </button>
+            
+            <button
+              onClick={() => handleTokenCollection('collect_bnb')}
+              disabled={isCollecting}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white py-4 px-6 rounded-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Wallet className="h-5 w-5" />
+              <span>{isCollecting ? 'Collecting...' : 'Collect All BNB'}</span>
+            </button>
+          </div>
+          
+          {collectionResults && (
+            <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
+              <h3 className="text-white font-semibold mb-2">Collection Results:</h3>
+              <pre className="text-gray-300 text-sm whitespace-pre-wrap font-mono">
+                {collectionResults}
+              </pre>
+            </div>
+          )}
+          
+          <div className="bg-blue-600/20 border border-blue-500 rounded-lg p-4 mt-4">
+            <h4 className="text-white font-semibold mb-2">Collection Information</h4>
+            <div className="text-sm text-gray-300 space-y-1">
+              <p>• <strong>Scan & Collect All:</strong> Scans all user wallets and collects both USDT + BNB automatically</p>
+              <p>• <strong>Collect All USDT:</strong> Collects USDT tokens from ALL user wallets to GLOBAL_ADMIN_WALLET</p>
+              <p>• <strong>Collect All BNB:</strong> Recovers BNB gas fees from ALL user wallets to GLOBAL_ADMIN_WALLET</p>
+              <p>• <strong>Minimum thresholds:</strong> USDT &gt; 0.01, BNB collection only if cost-effective</p>
+            </div>
+          </div>
         </div>
 
         {/* Pending Withdrawals */}

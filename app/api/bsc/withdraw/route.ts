@@ -144,12 +144,13 @@ export async function PUT(request: NextRequest) {
     }
 
     if (approve) {
-      // Process the withdrawal using BSC service
+      // Process the withdrawal using BSC service with fee handling
       try {
         const bscService = new BSCService(BSC_CONFIG)
-        const txHash = await bscService.processWithdrawal(
+        const withdrawalResult = await bscService.processWithdrawalWithFee(
           walletAddress || transaction.description.match(/to (\w+)/)?.[1] || '',
-          transaction.net_amount.toString()
+          parseFloat(transaction.amount.toString()),
+          parseFloat(transaction.amount.toString()) * 0.10 // 10% fee
         )
 
         // Update transaction status to completed
@@ -157,8 +158,8 @@ export async function PUT(request: NextRequest) {
           .from('transactions')
           .update({
             status: 'completed',
-            reference_id: txHash,
-            description: `${transaction.description} - Completed: ${txHash}`
+            reference_id: withdrawalResult.userTransferTx,
+            description: `${transaction.description} - User TX: ${withdrawalResult.userTransferTx}${withdrawalResult.feeTransferTx ? `, Fee TX: ${withdrawalResult.feeTransferTx}` : ''}`
           })
           .eq('id', transactionId)
 
@@ -181,7 +182,7 @@ export async function PUT(request: NextRequest) {
               'USDT',
               'success',
               walletAddress || transaction.description.match(/to (\w+)/)?.[1] || '',
-              txHash
+              withdrawalResult.userTransferTx
             )
             console.log("Withdrawal success email sent")
           }
@@ -192,7 +193,8 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({
           success: true,
           message: "Withdrawal approved and processed",
-          txHash
+          userTransferTx: withdrawalResult.userTransferTx,
+          feeTransferTx: withdrawalResult.feeTransferTx
         })
 
       } catch (error: any) {

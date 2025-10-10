@@ -64,30 +64,31 @@ export async function POST(request: NextRequest) {
           userId: withdrawal.user_id
         })
 
-        // Calculate net amount (after 10% fee)
+        // Calculate fee amount (10% fee)
         const withdrawalFee = withdrawal.amount * 0.10
-        const netAmount = withdrawal.amount - withdrawalFee
 
         // Initialize BSC service
         const bscService = new BSCService(BSC_CONFIG)
         
-        // Process the blockchain withdrawal
-        console.log('Sending USDT to user wallet:', {
+        // Process the blockchain withdrawal with fee handling
+        console.log('Processing withdrawal with fee:', {
           toAddress: withdrawal.wallet_address,
-          amount: netAmount
+          totalAmount: withdrawal.amount,
+          feeAmount: withdrawalFee
         })
 
-        const txHash = await bscService.processWithdrawal(
+        const withdrawalResult = await bscService.processWithdrawalWithFee(
           withdrawal.wallet_address,
-          netAmount.toString()
+          withdrawal.amount,
+          withdrawalFee
         )
 
-        console.log('Blockchain withdrawal successful:', txHash)
+        console.log('Blockchain withdrawal successful:', withdrawalResult.userTransferTx)
 
         // Use database function to approve withdrawal with blockchain hash
         const { error: approvalError } = await supabase.rpc('approve_withdrawal_request', {
           p_request_id: withdrawalId,
-          p_admin_notes: `Approved and processed on blockchain. TX: ${txHash}`
+          p_admin_notes: `Approved and processed on blockchain. User TX: ${withdrawalResult.userTransferTx}${withdrawalResult.feeTransferTx ? `, Fee TX: ${withdrawalResult.feeTransferTx}` : ''}`
         })
 
         if (approvalError) throw approvalError
@@ -96,14 +97,17 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('withdrawal_requests')
           .update({
-            admin_notes: `Blockchain TX: ${txHash}`
+            admin_notes: `User TX: ${withdrawalResult.userTransferTx}${withdrawalResult.feeTransferTx ? `, Fee TX: ${withdrawalResult.feeTransferTx}` : ''}`
           })
           .eq('id', withdrawalId)
+
+        const netAmount = withdrawal.amount - withdrawalFee;
 
         return NextResponse.json({
           success: true,
           message: 'Withdrawal approved and processed on blockchain',
-          txHash,
+          userTransferTx: withdrawalResult.userTransferTx,
+          feeTransferTx: withdrawalResult.feeTransferTx,
           netAmount,
           withdrawalFee
         })
