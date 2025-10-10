@@ -84,6 +84,8 @@ export default function ReferralPage() {
 
       const legacyCommission = legacyCommissions?.reduce((sum, c) => sum + parseFloat(c.commission_amount?.toString() || '0'), 0) || 0
 
+      console.log('Dual stats received:', dualStats)
+      
       setStats({
         total_referrals: dualStats.totalReferrals,
         total_commission: legacyCommission, // Keep for backward compatibility
@@ -220,7 +222,7 @@ export default function ReferralPage() {
         <div className="jarvis-card rounded-2xl p-6 mb-6">
           <h3 className="text-white font-bold text-lg mb-4">Dual Commission Structure</h3>
           <div className="space-y-3">
-            {stats?.level_stats.map((levelStat) => {
+            {stats?.level_stats && stats.level_stats.length > 0 ? stats.level_stats.map((levelStat) => {
               return (
                 <div key={levelStat.level} className="p-3 bg-white/5 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
@@ -246,7 +248,7 @@ export default function ReferralPage() {
                   </div>
                 </div>
               )
-            }) || referralLevels.map((level) => (
+            }) : referralLevels.map((level) => (
               <div key={level.level} className="p-3 bg-white/5 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-3">

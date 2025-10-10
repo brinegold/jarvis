@@ -256,6 +256,39 @@ export class DualReferralService {
   }
 
   /**
+   * Get direct referrals for a user
+   */
+  private async getDirectReferrals(userId: string): Promise<any[]> {
+    const { data: referrals, error } = await this.supabase
+      .from('referrals')
+      .select('*')
+      .eq('referrer_id', userId)
+    
+    if (error) {
+      console.error('Error fetching direct referrals:', error)
+      return []
+    }
+    
+    return referrals || []
+  }
+
+  /**
+   * Count referrals at a specific level (simplified approach)
+   */
+  private async countReferralsAtLevel(userId: string, level: number): Promise<number> {
+    // For now, return 0 for levels > 1 since we need to implement proper level counting
+    // This is a placeholder that can be enhanced later with recursive referral counting
+    if (level === 1) {
+      const directReferrals = await this.getDirectReferrals(userId)
+      return directReferrals.length
+    }
+    
+    // TODO: Implement proper multi-level referral counting
+    // This would require recursive queries to count referrals at each level
+    return 0
+  }
+
+  /**
    * Get referral statistics for a user
    */
   async getReferralStats(userId: string): Promise<{
@@ -285,26 +318,47 @@ export class DualReferralService {
       const totalUsdtEarned = commissions?.reduce((sum, c) => sum + (c.usdt_commission || 0), 0) || 0
       const totalJrcEarned = commissions?.reduce((sum, c) => sum + (c.jrc_commission || 0), 0) || 0
       
-      // Calculate level statistics
-      const levelStats = this.commissionRates.map(rate => {
+      // Get actual referral counts by level
+      const referralChain = await this.getReferralChain(userId)
+      const directReferrals = await this.getDirectReferrals(userId)
+      
+      // Calculate level statistics with actual referral counts
+      const levelStats = await Promise.all(this.commissionRates.map(async (rate) => {
         const levelCommissions = commissions?.filter(c => c.level === rate.level) || []
+        
+        // Count actual referrals at this level
+        let referralCount = 0
+        if (rate.level === 1) {
+          referralCount = directReferrals.length
+        } else {
+          // For deeper levels, we need to count referrals at that depth
+          referralCount = await this.countReferralsAtLevel(userId, rate.level)
+        }
+        
         return {
           level: rate.level,
-          count: levelCommissions.length,
+          count: referralCount,
           usdtEarned: levelCommissions.reduce((sum, c) => sum + (c.usdt_commission || 0), 0),
           jrcEarned: levelCommissions.reduce((sum, c) => sum + (c.jrc_commission || 0), 0),
           usdtRate: rate.usdtRate,
           jrcRate: rate.jrcRate
         }
-      })
+      }))
       
-      // Get total unique referrals
-      const uniqueReferrals = new Set(commissions?.map(c => c.referred_id) || [])
+      // Get total referrals from referrals table
+      const { data: allReferrals, error: referralsError } = await this.supabase
+        .from('referrals')
+        .select('referred_id')
+        .eq('referrer_id', userId)
+      
+      if (referralsError) {
+        console.error('Error fetching referrals:', referralsError)
+      }
       
       return {
         totalUsdtEarned,
         totalJrcEarned,
-        totalReferrals: uniqueReferrals.size,
+        totalReferrals: allReferrals?.length || 0,
         levelStats
       }
     } catch (error) {
