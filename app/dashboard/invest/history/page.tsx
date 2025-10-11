@@ -225,11 +225,9 @@ export default function InvestHistoryPage() {
                         <div>
                           <div className="flex items-center space-x-2">
                             <h3 className="text-lg font-semibold text-white">
-                              Plan {investment.plan_type} - ${investment.investment_amount.toFixed(2)}
+                             ${investment.investment_amount.toFixed(2)}
                             </h3>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${planDetails.bgColor} ${planDetails.color}`}>
-                              {planDetails.name}
-                            </span>
+                         
                           </div>
                           <p className="text-sm text-gray-300">
                             Daily: {investment.daily_percentage}% • ROI: {roi.toFixed(1)}%
@@ -309,28 +307,6 @@ export default function InvestHistoryPage() {
           )}
         </div>
 
-        {/* Performance Summary */}
-        {investments.length > 0 && (
-          <div className="mt-8 jarvis-card rounded-xl p-6">
-            <h3 className="text-xl font-bold text-white mb-4">Performance Summary</h3>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <p className="text-gray-400 text-sm">Total ROI</p>
-                <p className="text-2xl font-bold text-green-400">
-                  {totalInvested > 0 ? ((totalProfit / totalInvested) * 100).toFixed(1) : '0.0'}%
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-gray-400 text-sm">Net Profit</p>
-                <p className="text-2xl font-bold text-white">${totalProfit.toFixed(2)}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-gray-400 text-sm">Portfolio Value</p>
-                <p className="text-2xl font-bold text-white">${(totalInvested + totalProfit).toFixed(2)}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Quick Action */}
         {investments.length > 0 && (

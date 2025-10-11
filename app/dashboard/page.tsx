@@ -21,7 +21,8 @@ import {
   XCircle,
   MessageCircle,
   Youtube,
-  Twitter
+  Mail,
+  Send as Telegram
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -341,21 +342,23 @@ export default function DashboardPage() {
                 <Youtube className="h-4 w-4 sm:h-5 sm:w-5" />
               </a>
               <a 
-                href="https://twitter.com/jarvisstaking" 
+                href="https://t.me/Jarvistaking" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="p-1.5 sm:p-2 text-white hover:bg-blue-500/20 hover:text-blue-400 rounded-full transition-all duration-300"
-                title="Follow us on Twitter"
+                title="Follow us on Telegram"
               >
-                <Twitter className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Telegram className="h-4 w-4 sm:h-5 sm:w-5" />
               </a>
               {/* Existing buttons */}
-              <button className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full">
-                <Send className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
-              <button className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full">
-                <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
+      
+              <a 
+                href="mailto:support@jarvisstaking.com" 
+                className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full"
+                title="Email us"
+              >
+                <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
+              </a>
             </div>
           </div>
         </div>

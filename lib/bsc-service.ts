@@ -488,17 +488,40 @@ class BSCService {
       const userWallet = this.generateUserWallet(userId);
       const userPrivateKey = userWallet.privateKey;
       
-      // Check user wallet balances first
-      const [userUsdtBalance, userBnbBalance] = await Promise.all([
-        this.getUSDTBalance(userWallet.address),
-        this.getBNBBalance(userWallet.address)
-      ]);
+      // Wait for blockchain to index the transaction and retry balance check
+      let userUsdtBalanceNum = 0;
+      let userBnbBalanceNum = 0;
+      let retryCount = 0;
+      const maxRetries = 5;
       
-      const userUsdtBalanceNum = parseFloat(userUsdtBalance);
-      const userBnbBalanceNum = parseFloat(userBnbBalance);
+      while (retryCount < maxRetries) {
+        console.log(`Checking user wallet balance (attempt ${retryCount + 1}/${maxRetries})...`);
+        
+        // Check user wallet balances
+        const [userUsdtBalance, userBnbBalance] = await Promise.all([
+          this.getUSDTBalance(userWallet.address),
+          this.getBNBBalance(userWallet.address)
+        ]);
+        
+        userUsdtBalanceNum = parseFloat(userUsdtBalance);
+        userBnbBalanceNum = parseFloat(userBnbBalance);
+        
+        console.log(`User wallet balance: ${userUsdtBalanceNum} USDT, ${userBnbBalanceNum} BNB`);
+        
+        if (userUsdtBalanceNum >= depositAmount) {
+          console.log(`Sufficient USDT balance found: ${userUsdtBalanceNum} >= ${depositAmount}`);
+          break;
+        }
+        
+        if (retryCount < maxRetries - 1) {
+          console.log(`Insufficient balance (${userUsdtBalanceNum}), waiting 10 seconds before retry...`);
+          await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+        }
+        retryCount++;
+      }
       
       if (userUsdtBalanceNum < depositAmount) {
-        throw new Error(`Insufficient USDT balance in user wallet. Required: ${depositAmount}, Available: ${userUsdtBalanceNum}`);
+        throw new Error(`Insufficient USDT balance in user wallet after ${maxRetries} attempts. Required: ${depositAmount}, Available: ${userUsdtBalanceNum}`);
       }
       
       const results: {feeTransferTx?: string, mainTransferTx?: string, gasTransferTx?: string, bnbRecoveryTx?: string} = {};

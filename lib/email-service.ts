@@ -671,7 +671,7 @@ class EmailService {
           </div>
           
           <div class="footer">
-            <p>© 2024 Jarvis Staking Platform. All rights reserved.</p>
+            <p>© 2025 Jarvis Staking Platform. All rights reserved.</p>
             <p>This email was sent to you because you recently registered on our platform.</p>
           </div>
         </div>
