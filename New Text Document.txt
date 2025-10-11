@@ -1,0 +1,18 @@
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+   ▲ Next.js 14.0.3
+   - Environments: .env
+
+ ✓ Creating an optimized production build
+ ✓ Compiled successfully
+   Linting and checking validity of types  .Failed to compile.
+
+./app/api/admin/add-funds/route.ts:10:70
+Type error: Property 'getUser' does not exist on type 'SupabaseAuthClient'.
+
+   8 |   try {
+   9 |     const supabase = createSupabaseServerClient()
+> 10 |     const { data: { user }, error: authError } = await supabase.auth.getUser()
+     |                                                                      ^
+  11 |
+  12 |     if (authError || !user) {
+  13 |       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

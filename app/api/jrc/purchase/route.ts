@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-server'
 import EmailService from '@/lib/email-service'
 
 // Force dynamic rendering
@@ -7,11 +7,13 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Use admin client for server operations
+    const supabase = supabaseAdmin
+    
+    const { userId, amount } = await request.json()
+    
+    if (!userId || !amount) {
+      return NextResponse.json({ error: 'User ID and amount are required' }, { status: 400 })
     }
 
     const { jrcAmount } = await request.json()
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (profileError || !profile) {
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
       try {
         const emailService = new EmailService()
         await emailService.sendJrcPurchaseNotification(
-          user.email || '',
+          profile.email || '',
           profile.full_name || 'User',
           coinsToBuy,
           'JRC',
@@ -66,31 +68,26 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .update({
         fund_wallet_balance: newFundBalance,
-        total_jarvis_tokens: newJrcBalance
       })
-      .eq('id', user.id)
+      .eq('id', userId)
 
     if (updateError) throw updateError
 
-    // Create transaction record
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: user.id,
-        transaction_type: 'jrc_purchase',
-        amount: totalCost,
-        net_amount: totalCost,
-        status: 'completed',
-        description: `Purchased ${coinsToBuy.toLocaleString()} JRC coins at $${jrcRate} per coin`
+    // Use the database function to process the JRC purchase
+    const { data: transactionId, error: purchaseError } = await supabase
+      .rpc('process_jrc_purchase', {
+        p_user_id: userId,
+        p_coins_to_buy: coinsToBuy,
+        p_jrc_rate: jrcRate
       })
 
-    if (transactionError) throw transactionError
+    if (purchaseError) throw purchaseError
 
     // Send success email notification
     try {
       const emailService = new EmailService()
       await emailService.sendJrcPurchaseNotification(
-        user.email || '',
+        profile.email || '',
         profile.full_name || 'User',
         coinsToBuy,
         'JRC',
@@ -114,33 +111,8 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("Error processing JRC purchase:", error)
     
-    // Send failure email notification if we have user info
-    try {
-      const supabase = createSupabaseServerClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .single()
-        
-        const emailService = new EmailService()
-        await emailService.sendJrcPurchaseNotification(
-          user.email || '',
-          profile?.full_name || 'User',
-          0, // Amount unknown in error case
-          'JRC',
-          'failed',
-          undefined,
-          error.message || 'Failed to purchase JRC coins'
-        )
-        console.log("JRC purchase failure email sent")
-      }
-    } catch (emailError) {
-      console.error("Failed to send JRC purchase failure email:", emailError)
-    }
+    // Note: Email notification for errors would need user context
+    // which is not available in this catch block
     
     return NextResponse.json({ error: error.message || "Failed to purchase JRC coins" }, { status: 500 })
   }

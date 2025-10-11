@@ -140,6 +140,7 @@ export default function JRCStakingPage() {
         await dualReferralService.processDualReferralCommissions({
           userId: user?.id || '',
           amount: usdtEquivalent,
+          jrcEarned: stakingAmount, // JRC staking - the staked amount is the JRC earned for referral calculation
           transactionType: 'staking',
           planType: `JRC ${selectedPeriod?.label} at ${selectedPeriod?.apy} APY`
         })

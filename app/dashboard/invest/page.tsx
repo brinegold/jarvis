@@ -139,11 +139,12 @@ export default function InvestPage() {
 
       if (transactionError) throw transactionError
 
-      // Process dual referral commissions (USDT + JRV)
+      // Process dual referral commissions (USDT + JRC)
       try {
         await dualReferralService.processDualReferralCommissions({
           userId: user?.id || '',
           amount: investAmount,
+          jrcEarned: coinsEarned,
           transactionType: 'investment',
           planType: plan.name
         })

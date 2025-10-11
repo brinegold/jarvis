@@ -113,11 +113,12 @@ export default function StakingPage() {
 
       if (walletError) throw walletError
 
-      // Process dual referral commissions (USDT + JRV)
+      // Process dual referral commissions (USDT + JRC)
       try {
         await dualReferralService.processDualReferralCommissions({
           userId: user?.id || '',
           amount: stakingAmount,
+          jrcEarned: 0, // USDT staking doesn't earn JRC coins
           transactionType: 'staking',
           planType: `${selectedPeriod?.label} at ${selectedPeriod?.apy} APY`
         })

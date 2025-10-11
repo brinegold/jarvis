@@ -74,17 +74,28 @@ export default function ReferralPage() {
       setProfile(profileData)
 
       // Fetch dual referral stats using the new service
+      console.log('🔍 Fetching referral stats for user:', user?.id)
       const dualStats = await dualReferralService.getReferralStats(user?.id || '')
+      console.log('📊 Dual stats received:', dualStats)
 
       // Fetch legacy commission for backward compatibility
       const { data: legacyCommissions, error: commissionsError } = await supabase
         .from('referral_commissions')
-        .select('commission_amount')
+        .select('*')
         .eq('referrer_id', user?.id)
+
+      console.log('💰 Legacy commissions:', legacyCommissions)
+      if (commissionsError) console.error('❌ Commission error:', commissionsError)
 
       const legacyCommission = legacyCommissions?.reduce((sum, c) => sum + parseFloat(c.commission_amount?.toString() || '0'), 0) || 0
 
-      console.log('Dual stats received:', dualStats)
+      console.log('📈 Final stats being set:', {
+        total_referrals: dualStats.totalReferrals,
+        total_usdt_earned: dualStats.totalUsdtEarned,
+        total_jrc_earned: dualStats.totalJrcEarned,
+        level_stats: dualStats.levelStats,
+        legacy_commission: legacyCommission
+      })
       
       setStats({
         total_referrals: dualStats.totalReferrals,
@@ -222,57 +233,37 @@ export default function ReferralPage() {
         <div className="jarvis-card rounded-2xl p-6 mb-6">
           <h3 className="text-white font-bold text-lg mb-4">Dual Commission Structure</h3>
           <div className="space-y-3">
-            {stats?.level_stats && stats.level_stats.length > 0 ? stats.level_stats.map((levelStat) => {
+            {/* Always show all 10 levels with actual data when available */}
+            {referralLevels.map((level) => {
+              // Find matching level stat if it exists
+              const levelStat = stats?.level_stats?.find(ls => ls.level === level.level)
+              
               return (
-                <div key={levelStat.level} className="p-3 bg-white/5 rounded-lg">
+                <div key={level.level} className="p-3 bg-white/5 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-sm font-bold">{levelStat.level}</span>
+                        <span className="text-white text-sm font-bold">{level.level}</span>
                       </div>
                       <div>
-                        <p className="text-white font-semibold">Level {levelStat.level}</p>
-                        <p className="text-gray-300 text-sm">{levelStat.count} referrals</p>
+                        <p className="text-white font-semibold">Level {level.level}</p>
+                        <p className="text-gray-300 text-sm">{levelStat?.count || 0} referrals</p>
                       </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-2">
                     <div className="bg-green-500/10 rounded p-2">
-                      <p className="text-green-400 font-bold text-sm">{levelStat.usdtRate}% USDT</p>
-                      <p className="text-gray-400 text-xs">Earned: ${levelStat.usdtEarned?.toFixed(2) || '0.00'}</p>
+                      <p className="text-green-400 font-bold text-sm">{level.percentage}% USDT</p>
+                      <p className="text-gray-400 text-xs">Earned: ${levelStat?.usdtEarned?.toFixed(2) || '0.00'}</p>
                     </div>
                     <div className="bg-yellow-500/10 rounded p-2">
-                      <p className="text-yellow-400 font-bold text-sm">{levelStat.jrcRate}% JRC</p>
-                      <p className="text-gray-400 text-xs">Earned: {levelStat.jrcEarned?.toLocaleString() || '0'} JRC</p>
+                      <p className="text-yellow-400 font-bold text-sm">{level.percentage + 5}% JRC</p>
+                      <p className="text-gray-400 text-xs">Earned: {levelStat?.jrcEarned?.toLocaleString() || '0'} JRC</p>
                     </div>
                   </div>
                 </div>
               )
-            }) : referralLevels.map((level) => (
-              <div key={level.level} className="p-3 bg-white/5 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-bold">{level.level}</span>
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold">Level {level.level}</p>
-                      <p className="text-gray-300 text-sm">0 referrals</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <div className="bg-green-500/10 rounded p-2">
-                    <p className="text-green-400 font-bold text-sm">{level.percentage}% USDT</p>
-                    <p className="text-gray-400 text-xs">Earned: $0.00</p>
-                  </div>
-                  <div className="bg-yellow-500/10 rounded p-2">
-                    <p className="text-yellow-400 font-bold text-sm">{level.percentage + 5}% JRC</p>
-                    <p className="text-gray-400 text-xs">Earned: 0 JRC</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+            })}
           </div>
         </div>
 

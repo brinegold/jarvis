@@ -27,6 +27,7 @@ import {
 import Link from 'next/link'
 import Image from 'next/image'
 import DockNavbar from '@/components/DockNavbar'
+import { dualReferralService } from '@/lib/referralService'
 
 interface Profile {
   id: string
@@ -70,6 +71,11 @@ export default function DashboardPage() {
   const [selectedIncomeType, setSelectedIncomeType] = useState<string>('')
   const [incomeData, setIncomeData] = useState<any[]>([])
   const [referralCommissions, setReferralCommissions] = useState(0)
+  const [referralUsdtEarned, setReferralUsdtEarned] = useState(0)
+  const [referralJrcEarned, setReferralJrcEarned] = useState(0)
+  const [totalReferrals, setTotalReferrals] = useState(0)
+  const [teamInvestment, setTeamInvestment] = useState(0)
+  const [totalJrcStaked, setTotalJrcStaked] = useState(0)
   const [plans, setPlans] = useState<InvestmentPlan[]>([])
   const [jrcStakingPlans, setJrcStakingPlans] = useState<JrcStakingPlan[]>([])
   const [totalJrcEarned, setTotalJrcEarned] = useState(0)
@@ -135,7 +141,71 @@ export default function DashboardPage() {
         const totalJrcEarned = (jrcStakingData || []).reduce((sum: number, plan: JrcStakingPlan) => 
           sum + (plan.total_profit_earned || 0), 0)
         setTotalJrcEarned(totalJrcEarned)
+        
+        // Calculate total JRC staked (only active plans)
+        const totalStaked = (jrcStakingData || [])
+          .filter(plan => plan.status === 'active')
+          .reduce((sum: number, plan: JrcStakingPlan) => sum + (plan.amount || 0), 0)
+        setTotalJrcStaked(totalStaked)
+        
+        console.log('📊 JRC Staking calculation:', {
+          jrcStakingPlans: jrcStakingData?.length || 0,
+          totalStaked,
+          planAmounts: jrcStakingData?.map(p => p.amount) || []
+        })
       }
+
+      // Fetch dual referral stats
+      try {
+        const dualStats = await dualReferralService.getReferralStats(user?.id || '')
+        setReferralUsdtEarned(dualStats.totalUsdtEarned)
+        setReferralJrcEarned(dualStats.totalJrcEarned)
+        setTotalReferrals(dualStats.totalReferrals)
+        
+        // Use only the dual stats total USDT earned to avoid double counting
+        setReferralCommissions(dualStats.totalUsdtEarned)
+      } catch (error) {
+        console.error('Error fetching referral stats:', error)
+        
+        // Fallback to legacy commissions if dual stats fail
+        try {
+          const { data: legacyCommissions } = await supabase
+            .from('referral_commissions')
+            .select('commission_amount')
+            .eq('referrer_id', user?.id)
+          
+          const legacyTotal = legacyCommissions?.reduce((sum, c) => sum + parseFloat(c.commission_amount?.toString() || '0'), 0) || 0
+          setReferralCommissions(legacyTotal)
+        } catch (legacyError) {
+          console.error('Error fetching legacy referral stats:', legacyError)
+        }
+      }
+
+      // Fetch team investment data (sum of all referrals' investments)
+      try {
+        const { data: directReferrals } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('sponsor_id', profile?.referral_code)
+        
+        if (directReferrals && directReferrals.length > 0) {
+          const referralIds = directReferrals.map(r => r.id)
+          
+          // Get total investments from all direct referrals
+          const { data: teamInvestments } = await supabase
+            .from('investment_plans')
+            .select('investment_amount')
+            .in('user_id', referralIds)
+          
+          const totalTeamInvestment = teamInvestments?.reduce((sum, inv) => sum + inv.investment_amount, 0) || 0
+          setTeamInvestment(totalTeamInvestment)
+        }
+      } catch (error) {
+        console.error('Error fetching team investment data:', error)
+      }
+
+      // Calculate total JRC staked (will be updated after JRC staking data is fetched)
+      // This is moved to after the JRC staking data fetch
 
     } catch (error) {
       console.error('Error fetching user data:', error)
@@ -498,24 +568,10 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-            <p className="text-white font-bold text-sm sm:text-base">0 JRC</p>
+            <p className="text-white font-bold text-sm sm:text-base">{referralJrcEarned.toLocaleString()} JRC</p>
           </div>
 
-          <div className="jarvis-card rounded-xl p-3 sm:p-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-green-400" />
-              <div>
-                <p className="text-white font-semibold text-sm sm:text-base">Trade Income</p>
-                <button 
-                  onClick={() => handleViewIncome('trade')}
-                  className="text-blue-400 text-xs sm:text-sm hover:text-blue-300"
-                >
-                  VIEW
-                </button>
-              </div>
-            </div>
-            <p className="text-white font-bold text-sm sm:text-base">${totalProfits.toFixed(2)}</p>
-          </div>
+      
 
           <div className="jarvis-card rounded-xl p-3 sm:p-4 flex items-center justify-between">
             <div className="flex items-center space-x-2 sm:space-x-3">
@@ -530,7 +586,7 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-            <p className="text-white font-bold text-sm sm:text-base">$0</p>
+            <p className="text-white font-bold text-sm sm:text-base">${referralCommissions.toFixed(2)}</p>
           </div>
 
 
@@ -578,22 +634,22 @@ export default function DashboardPage() {
               </div>
               <div className="text-center">
                 <p className="text-gray-300 text-xs sm:text-sm">My Referrals</p>
-                <p className="text-lg sm:text-2xl font-bold text-white">0</p>
+                <p className="text-lg sm:text-2xl font-bold text-white">{totalReferrals || 0}</p>
               </div>
             </div>
             <div className="space-y-3 sm:space-y-4">
               <div className="text-center">
                 <p className="text-gray-300 text-xs sm:text-sm">Team Investment</p>
-                <p className="text-lg sm:text-2xl font-bold text-white">$0</p>
+                <p className="text-lg sm:text-2xl font-bold text-white">${(teamInvestment || 0).toFixed(2)}</p>
               </div>
               <div className="space-y-2">
                 <div className="text-center">
                   <p className="text-gray-300 text-xs sm:text-sm">Staking Progress</p>
-                  <p className="text-lg sm:text-2xl font-bold text-white">$0</p>
+                  <p className="text-lg sm:text-2xl font-bold text-white">${(totalProfits || 0).toFixed(2)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-gray-300 text-xs sm:text-sm">Jarvis Staking</p>
-                  <p className="text-lg sm:text-2xl font-bold text-white">0 JRC</p>
+                  <p className="text-lg sm:text-2xl font-bold text-white">{(totalJrcStaked || 0).toLocaleString()} JRC</p>
                 </div>
               </div>
             </div>

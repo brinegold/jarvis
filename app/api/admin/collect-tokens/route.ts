@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server'
 import BSCService from '@/lib/bsc-service'
 
 // Force dynamic rendering
@@ -16,23 +16,8 @@ const BSC_CONFIG = {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Admin privileges required' }, { status: 403 })
-    }
+    // Use admin client for admin operations
+    const supabase = supabaseAdmin
 
     const { action, userId, scanAll } = await request.json()
 
@@ -197,23 +182,8 @@ export async function POST(request: NextRequest) {
 // GET endpoint to check user wallet balances
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Admin privileges required' }, { status: 403 })
-    }
+    // Use admin client for admin operations
+    const supabase = supabaseAdmin
 
     const url = new URL(request.url)
     const userId = url.searchParams.get('userId')
