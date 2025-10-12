@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabase'
+import { createSupabaseClient } from '@/lib/supabase'
 import { Bot, Eye, EyeOff, User } from 'lucide-react'
 
 export default function SignInPage() {
@@ -18,6 +18,7 @@ export default function SignInPage() {
   const [error, setError] = useState('')
   const [captchaCode] = useState(() => Math.floor(100000 + Math.random() * 900000).toString())
   const router = useRouter()
+  const supabase = createSupabaseClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,7 +32,7 @@ export default function SignInPage() {
     }
 
     try {
-      const { data, error } = await (supabase.auth as any).signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       })

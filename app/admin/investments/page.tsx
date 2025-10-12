@@ -107,7 +107,7 @@ export default function InvestmentsManagement() {
 
       if (error) throw error
 
-      const formattedInvestments = data?.map(inv => ({
+      const formattedInvestments = data?.map((inv: any) => ({
         id: inv.id,
         user_id: inv.user_id,
         plan_type: inv.plan_type,

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createSupabaseClient } from '@/lib/supabase'
 import { ArrowLeft, User, Mail, Phone, Globe, Key, LogOut, Save } from 'lucide-react'
 import Link from 'next/link'
 
@@ -30,6 +30,7 @@ export default function ProfilePage() {
   const [isSaving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const supabase = createSupabaseClient()
 
   useEffect(() => {
     if (!loading && !user) {
@@ -85,7 +86,7 @@ export default function ProfilePage() {
 
       // Update password if provided
       if (formData.password) {
-        const { error: passwordError } = await (supabase.auth as any).updateUser({
+        const { error: passwordError } = await supabase.auth.updateUser({
           password: formData.password
         })
 

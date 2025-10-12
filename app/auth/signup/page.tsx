@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabase'
+import { createSupabaseClient } from '@/lib/supabase'
 import { Eye, EyeOff, User } from 'lucide-react'
 
 export default function SignUpPage() {
@@ -19,6 +19,7 @@ export default function SignUpPage() {
   const [error, setError] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
+  const supabase = createSupabaseClient()
 
   // Auto-fetch referral code from URL
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function SignUpPage() {
 
     try {
       // Sign up the user
-      const { data: authData, error: authError } = await (supabase.auth as any).signUp({
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {

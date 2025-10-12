@@ -1,8 +1,9 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import type { User } from '@supabase/auth-helpers-nextjs'
-import { supabase } from '@/lib/supabase'
+import { createSupabaseClient } from '@/lib/supabase'
+
+type User = any // Using any type to avoid import issues
 
 interface AuthContextType {
   user: User | null
@@ -27,11 +28,12 @@ export const useAuth = () => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const supabase = createSupabaseClient()
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await (supabase.auth as any).getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
       setLoading(false)
     }
@@ -39,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getInitialSession()
 
     // Listen for auth changes
-    const { data: { subscription } } = (supabase.auth as any).onAuthStateChange(
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: any, session: any) => {
         setUser(session?.user ?? null)
         setLoading(false)
@@ -50,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase.auth])
 
   const signOut = async () => {
-    await (supabase.auth as any).signOut()
+    await supabase.auth.signOut()
   }
 
   return (
