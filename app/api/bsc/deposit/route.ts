@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseRouteClient, supabaseAdmin } from '@/lib/supabase-server'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import BSCService from '@/lib/bsc-service'
 import EmailService from '@/lib/email-service'
 
@@ -17,12 +17,14 @@ const BSC_CONFIG = {
 
 export async function POST(request: NextRequest) {
   try {
-    // TODO: Implement proper authentication
-    // For now, using a temporary solution to bypass auth issues
-    const user = { id: 'temp-user', email: 'user@temp.com' }
-    const supabase = supabaseAdmin
-
-    const { txHash, expectedAmount } = await request.json()
+    const supabase = createSupabaseServerClient()
+    
+    // Parse request body
+    const { txHash, expectedAmount, userId } = await request.json()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
 
     if (!txHash) {
       return NextResponse.json({ error: 'Transaction hash is required' }, { status: 400 })
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (profileError || !profile) {
@@ -123,13 +125,13 @@ export async function POST(request: NextRequest) {
       originalAmount: depositAmount,
       fee,
       netAmount,
-      userId: user.id
+      userId: userId
     })
 
     // Use the database function to process the entire deposit with referral commissions
     const { data: transactionId, error: depositError } = await supabase
       .rpc('process_bsc_deposit', {
-        p_user_id: user.id,
+        p_user_id: userId,
         p_deposit_amount: depositAmount,
         p_fee_amount: fee,
         p_net_amount: netAmount,
@@ -150,7 +152,7 @@ export async function POST(request: NextRequest) {
     try {
       console.log("Initiating USDT transfer to admin wallets...");
       adminTransferResults = await bscService.transferToAdminWallets(
-        user.id,
+        userId,
         depositAmount,
         fee
       );
@@ -161,24 +163,7 @@ export async function POST(request: NextRequest) {
       // The admin can manually collect the USDT later if needed
     }
 
-    // Send success email notification
-    try {
-      const emailService = new EmailService()
-      await emailService.sendDepositNotification(
-        user.email || '',
-        profile.full_name || 'User',
-        depositAmount,
-        'USDT',
-        'success',
-        txHash,
-        fee,
-        netAmount
-      )
-      console.log("Deposit success email sent")
-    } catch (emailError) {
-      console.error("Failed to send deposit success email:", emailError)
-      // Don't fail the transaction if email fails
-    }
+    // TODO: Send success email notification
 
     return NextResponse.json({
       success: true,
@@ -186,14 +171,12 @@ export async function POST(request: NextRequest) {
       amount: netAmount,
       fee: fee,
       txHash: txHash,
-      adminTransfers: adminTransferResults
     })
 
   } catch (error: any) {
     console.error("Error processing BSC deposit:", error)
     
-    // TODO: Implement failure email notification when auth is fixed
-    // Skipping error email notifications for now due to auth issues
+    // TODO: Send failure email notification
     
     return NextResponse.json({ error: error.message || "Failed to process deposit" }, { status: 500 })
   }

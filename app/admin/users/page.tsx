@@ -124,7 +124,7 @@ export default function UsersManagement() {
       if (referralError) throw referralError
 
       // Process data
-      const processedUsers = usersData?.map((user: any) => {
+      const processedUsers = usersData?.map(user => {
         const userInvestments = investmentData?.filter(inv => inv.user_id === user.id) || []
         const userWithdrawals = withdrawalData?.filter(wd => wd.user_id === user.id) || []
         const userReferrals = referralData?.filter(ref => ref.sponsor_id === user.referral_code) || []

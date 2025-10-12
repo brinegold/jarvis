@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseRouteClient } from '@/lib/supabase-server'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import EmailService from '@/lib/email-service'
 
 // Force dynamic rendering
@@ -7,13 +7,15 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseRouteClient()
-    
     // TODO: Implement proper authentication
-    // For now, using a temporary solution to bypass auth issues
-    const user = { id: 'temp-user', email: 'user@temp.com' }
-
-    const { transferType, amount, receiverId } = await request.json()
+    const supabase = createSupabaseServerClient()
+    
+    // Parse request body
+    const { transferType, amount, receiverId, userId } = await request.json()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
 
     if (!transferType || !amount) {
       return NextResponse.json({ error: 'Transfer type and amount are required' }, { status: 400 })
@@ -29,7 +31,7 @@ export async function POST(request: NextRequest) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (profileError || !profile) {
@@ -48,36 +50,18 @@ export async function POST(request: NextRequest) {
           main_wallet_balance: profile.main_wallet_balance - transferAmount,
           fund_wallet_balance: profile.fund_wallet_balance + transferAmount
         })
-        .eq('id', user.id)
+        .eq('id', userId)
 
       if (updateError) throw updateError
 
       // Create transaction record
       await supabase.from('transactions').insert({
-        user_id: user.id,
-        transaction_type: 'wallet_transfer',
-        amount: transferAmount,
         net_amount: transferAmount,
         status: 'completed',
         description: 'Transfer from Main to Fund Wallet'
       })
 
-      // Send email notification for main-to-fund transfer
-      try {
-        const emailService = new EmailService()
-        await emailService.sendTransferNotification(
-          user.email || '',
-          profile.full_name || 'User',
-          transferAmount,
-          'USDT',
-          'success',
-          'Main Wallet',
-          'Fund Wallet'
-        )
-        console.log("Main-to-fund transfer email sent")
-      } catch (emailError) {
-        console.error("Failed to send transfer email:", emailError)
-      }
+      // TODO: Send email notification for main-to-fund transfer
 
       return NextResponse.json({
         success: true,
@@ -107,7 +91,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Receiver not found' }, { status: 400 })
       }
 
-      if (receiver.id === user.id) {
+      if (receiver.id === userId) {
         return NextResponse.json({ error: 'Cannot transfer to yourself' }, { status: 400 })
       }
 
@@ -117,7 +101,7 @@ export async function POST(request: NextRequest) {
         .update({
           fund_wallet_balance: profile.fund_wallet_balance - transferAmount
         })
-        .eq('id', user.id)
+        .eq('id', userId)
 
       if (senderError) throw senderError
 
@@ -142,7 +126,7 @@ export async function POST(request: NextRequest) {
       // Create transaction records
       await supabase.from('transactions').insert([
         {
-          user_id: user.id,
+          user_id: userId,
           transaction_type: 'transfer_sent',
           amount: transferAmount,
           net_amount: transferAmount,
@@ -155,47 +139,11 @@ export async function POST(request: NextRequest) {
           amount: transferAmount,
           net_amount: transferAmount,
           status: 'completed',
-          description: `Transfer from ${user.email}`
+          description: `Transfer to ${receiverId}`
         }
       ])
 
-      // Send email notifications for fund-to-fund transfer
-      try {
-        const emailService = new EmailService()
-        
-        // Get receiver email using admin client
-        const { supabaseAdmin } = await import('@/lib/supabase-server')
-        // TODO: Fix admin auth method - temporarily skip getting receiver auth
-        const receiverAuth = { user: { email: 'temp@example.com' } }
-
-        // Send email to sender
-        await emailService.sendTransferNotification(
-          user.email || '',
-          profile.full_name || 'User',
-          transferAmount,
-          'USDT',
-          'success',
-          'Your Fund Wallet',
-          `${receiver.full_name || receiverId}'s Fund Wallet`
-        )
-
-        // Send email to receiver
-        if (receiverAuth.user?.email) {
-          await emailService.sendTransferNotification(
-            receiverAuth.user.email,
-            receiver.full_name || 'User',
-            transferAmount,
-            'USDT',
-            'success',
-            `${profile.full_name || user.email || 'User'}'s Fund Wallet`,
-            'Your Fund Wallet'
-          )
-        }
-
-        console.log("Fund-to-fund transfer emails sent")
-      } catch (emailError) {
-        console.error("Failed to send transfer emails:", emailError)
-      }
+      // TODO: Send email notifications for fund-to-fund transfer
 
       return NextResponse.json({
         success: true,
@@ -209,8 +157,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("Error processing transfer:", error)
     
-    // TODO: Implement failure email notification when auth is fixed
-    // Skipping error email notifications for now due to auth issues
+    // TODO: Send failure email notification
     
     return NextResponse.json({ error: error.message || "Failed to process transfer" }, { status: 500 })
   }

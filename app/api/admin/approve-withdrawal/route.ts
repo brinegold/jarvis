@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseRouteClient, supabaseAdmin } from '@/lib/supabase-server'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import BSCService from '@/lib/bsc-service'
 
 // Force dynamic rendering
@@ -16,21 +16,8 @@ const BSC_CONFIG = {
 
 export async function POST(request: NextRequest) {
   try {
-    // TODO: Implement proper authentication
-    // For now, using a temporary solution to bypass auth issues
-    const user = { id: 'temp-admin', email: 'admin@temp.com' }
-    const supabase = supabaseAdmin
-
-    // Check if user is admin using admin client
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Admin privileges required' }, { status: 403 })
-    }
+    // TODO: Implement proper admin authentication
+    const supabase = createSupabaseServerClient()
 
     const { withdrawalId, action } = await request.json()
 

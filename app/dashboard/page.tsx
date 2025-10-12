@@ -315,7 +315,8 @@ export default function DashboardPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          jrcAmount: jrcAmount
+          jrcAmount: jrcAmount,
+          userId: user.id
         })
       })
 

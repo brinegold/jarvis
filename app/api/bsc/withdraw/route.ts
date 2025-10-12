@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseRouteClient, supabaseAdmin } from '@/lib/supabase-server'
+import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server'
 import BSCService from '@/lib/bsc-service'
 import EmailService from '@/lib/email-service'
 
@@ -17,12 +17,14 @@ const BSC_CONFIG = {
 
 export async function POST(request: NextRequest) {
   try {
-    // TODO: Implement proper authentication
-    // For now, using a temporary solution to bypass auth issues
-    const user = { id: 'temp-user', email: 'user@temp.com' }
-    const supabase = supabaseAdmin
-
-    const { amount, walletAddress } = await request.json()
+    const supabase = createSupabaseServerClient()
+    
+    // Parse request body
+    const { amount, walletAddress, userId } = await request.json()
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
 
     if (!amount || !walletAddress) {
       return NextResponse.json({ error: 'Amount and wallet address are required' }, { status: 400 })
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (profileError || !profile) {
@@ -55,14 +57,14 @@ export async function POST(request: NextRequest) {
       requestedAmount: withdrawAmount,
       withdrawalFee,
       netAmount,
-      userId: user.id,
+      userId: userId,
       toAddress: walletAddress
     })
 
     // Use the database function to create withdrawal request
     const { data: transactionId, error: withdrawalError } = await supabase
       .rpc('create_withdrawal_request', {
-        p_user_id: user.id,
+        p_user_id: userId,
         p_amount: withdrawAmount,
         p_fee: withdrawalFee,
         p_net_amount: netAmount,
@@ -76,22 +78,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Withdrawal request created successfully - awaiting admin approval")
 
-    // Send pending withdrawal email notification
-    try {
-      const emailService = new EmailService()
-      await emailService.sendWithdrawalNotification(
-        user.email || '',
-        profile.full_name || 'User',
-        withdrawAmount,
-        'USDT',
-        'pending',
-        walletAddress
-      )
-      console.log("Withdrawal pending email sent")
-    } catch (emailError) {
-      console.error("Failed to send withdrawal pending email:", emailError)
-      // Don't fail the transaction if email fails
-    }
+    // TODO: Send pending withdrawal email notification
 
     return NextResponse.json({
       success: true,
@@ -113,9 +100,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     // TODO: Implement proper authentication
-    // For now, using a temporary solution to bypass auth issues
-    const user = { id: 'temp-admin', email: 'admin@temp.com' }
-    const supabase = supabaseAdmin
+    const supabase = createSupabaseServerClient()
 
     // TODO: Add admin role check here
     // For now, any authenticated user can approve (should be restricted to admins)
@@ -153,39 +138,12 @@ export async function PUT(request: NextRequest) {
         await supabase
           .from('transactions')
           .update({
-            status: 'completed',
             reference_id: withdrawalResult.userTransferTx,
             description: `${transaction.description} - User TX: ${withdrawalResult.userTransferTx}${withdrawalResult.feeTransferTx ? `, Fee TX: ${withdrawalResult.feeTransferTx}` : ''}`
           })
           .eq('id', transactionId)
 
-        // Send successful withdrawal email notification
-        try {
-          const { data: userProfile } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', transaction.user_id)
-            .single()
-
-          // TODO: Fix admin auth method - temporarily skip getting user auth
-          const userData = { user: { email: 'temp@example.com' } }
-          
-          if (userData.user?.email) {
-            const emailService = new EmailService()
-            await emailService.sendWithdrawalNotification(
-              userData.user.email,
-              userProfile?.full_name || 'User',
-              parseFloat(transaction.amount.toString()),
-              'USDT',
-              'success',
-              walletAddress || transaction.description.match(/to (\w+)/)?.[1] || '',
-              withdrawalResult.userTransferTx
-            )
-            console.log("Withdrawal success email sent")
-          }
-        } catch (emailError) {
-          console.error("Failed to send withdrawal success email:", emailError)
-        }
+        // TODO: Send successful withdrawal email notification
 
         return NextResponse.json({
           success: true,
@@ -194,8 +152,8 @@ export async function PUT(request: NextRequest) {
           feeTransferTx: withdrawalResult.feeTransferTx
         })
 
-      } catch (error: any) {
-        console.error('Error processing withdrawal:', error)
+      } catch (txError: any) {
+        console.error('Error processing withdrawal:', txError)
         
         // Use database function to handle failed withdrawal
         const { error: approvalError } = await supabase
@@ -205,36 +163,9 @@ export async function PUT(request: NextRequest) {
             p_blockchain_tx_hash: null
           })
 
-        // Send failed withdrawal email notification
-        try {
-          const { data: userProfile } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', transaction.user_id)
-            .single()
+        // TODO: Send failed withdrawal email notification
 
-          // TODO: Fix admin auth method - temporarily skip getting user auth
-          const userData = { user: { email: 'temp@example.com' } }
-          
-          if (userData.user?.email) {
-            const emailService = new EmailService()
-            await emailService.sendWithdrawalNotification(
-              userData.user.email,
-              userProfile?.full_name || 'User',
-              parseFloat(transaction.amount.toString()),
-              'USDT',
-              'failed',
-              walletAddress || transaction.description.match(/to (\w+)/)?.[1] || '',
-              undefined,
-              error.message
-            )
-            console.log("Withdrawal failure email sent")
-          }
-        } catch (emailError) {
-          console.error("Failed to send withdrawal failure email:", emailError)
-        }
-
-        return NextResponse.json({ error: `Withdrawal processing failed: ${error.message}` }, { status: 500 })
+        return NextResponse.json({ error: `Withdrawal processing failed: ${txError.message}` }, { status: 500 })
       }
     } else {
       // Use database function to reject withdrawal
@@ -250,34 +181,7 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to reject withdrawal' }, { status: 500 })
       }
 
-      // Send withdrawal rejection email notification
-      try {
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', transaction.user_id)
-          .single()
-
-        // TODO: Fix admin auth method - temporarily skip getting user auth
-        const userData = { user: { email: 'temp@example.com' } }
-        
-        if (userData.user?.email) {
-          const emailService = new EmailService()
-          await emailService.sendWithdrawalNotification(
-            userData.user.email,
-            userProfile?.full_name || 'User',
-            parseFloat(transaction.amount.toString()),
-            'USDT',
-            'failed',
-            walletAddress || transaction.description.match(/to (\w+)/)?.[1] || '',
-            undefined,
-            'Withdrawal request was rejected by admin. Amount has been refunded to your account.'
-          )
-          console.log("Withdrawal rejection email sent")
-        }
-      } catch (emailError) {
-        console.error("Failed to send withdrawal rejection email:", emailError)
-      }
+      // TODO: Send withdrawal rejection email notification
 
       return NextResponse.json({
         success: true,

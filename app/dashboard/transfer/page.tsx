@@ -80,7 +80,8 @@ export default function TransferPage() {
         body: JSON.stringify({
           transferType,
           amount: transferAmount,
-          receiverId: transferType === 'fund-to-fund' ? receiverId : undefined
+          receiverId: transferType === 'fund-to-fund' ? receiverId : undefined,
+          userId: user.id
         })
       })
 

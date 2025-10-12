@@ -45,7 +45,7 @@ async function distributeInvestmentProfits() {
     }
 
     const today = new Date().toISOString().split('T')[0]
-    const profitDistributions: any[] = []
+    const profitDistributions = []
     const userUpdates = new Map()
 
     for (const plan of plans) {
@@ -225,7 +225,7 @@ async function distributeJrcStakingProfits() {
     }
 
     const today = new Date().toISOString().split('T')[0]
-    const stakingDistributions: any[] = []
+    const stakingDistributions = []
     const stakingUserUpdates = new Map()
 
     for (const plan of stakingPlans) {

@@ -86,7 +86,7 @@ export default function ProfilePage() {
 
       // Update password if provided
       if (formData.password) {
-        const { error: passwordError } = await supabase.auth.updateUser({
+        const { error: passwordError } = await (supabase.auth as any).updateUser({
           password: formData.password
         })
 

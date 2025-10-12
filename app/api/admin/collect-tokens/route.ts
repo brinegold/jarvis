@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseRouteClient, supabaseAdmin } from '@/lib/supabase-server'
+import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server'
 import BSCService from '@/lib/bsc-service'
 
 // Force dynamic rendering
@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
           let totalCollected = 0
           let successCount = 0
           let errorCount = 0
-          const collections: any[] = []
-          const errors: any[] = []
+          const collections = []
+          const errors = []
 
           for (const uid of userIds) {
             try {
@@ -143,8 +143,8 @@ export async function POST(request: NextRequest) {
           let totalCollected = 0
           let successCount = 0
           let errorCount = 0
-          const collections: any[] = []
-          const errors: any[] = []
+          const collections = []
+          const errors = []
 
           for (const uid of userIds) {
             try {

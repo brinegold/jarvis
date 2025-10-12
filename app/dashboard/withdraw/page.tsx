@@ -83,7 +83,8 @@ export default function WithdrawPage() {
         },
         body: JSON.stringify({ 
           amount: withdrawAmount,
-          walletAddress: walletAddress
+          walletAddress: walletAddress,
+          userId: user.id
         })
       })
 

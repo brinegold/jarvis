@@ -38,14 +38,18 @@ export default function DepositPage() {
 
   const fetchWalletInfo = async () => {
     try {
-      const response = await fetch('/api/bsc/wallet')
+      const response = await fetch(`/api/bsc/my-wallet?userId=${user.id}`)
       if (response.ok) {
         const data = await response.json()
         setWalletInfo(data)
+        console.log('✅ Wallet info loaded:', data)
       } else {
-        setError('Failed to load wallet information')
+        const errorData = await response.json()
+        console.error('❌ Failed to load wallet:', errorData)
+        setError(`Failed to load wallet information: ${errorData.error || 'Unknown error'}`)
       }
     } catch (error) {
+      console.error('❌ Wallet fetch error:', error)
       setError('Failed to load wallet information')
     } finally {
       setLoadingWallet(false)
@@ -95,7 +99,7 @@ export default function DepositPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ txHash, expectedAmount: amount })
+        body: JSON.stringify({ txHash, expectedAmount: amount, userId: user.id })
       })
 
       const data = await response.json()

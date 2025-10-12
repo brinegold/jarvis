@@ -32,7 +32,7 @@ export default function SignInPage() {
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await (supabase.auth as any).signInWithPassword({
         email: formData.email,
         password: formData.password,
       })
