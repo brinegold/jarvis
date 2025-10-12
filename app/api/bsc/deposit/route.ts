@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server'
 import BSCService from '@/lib/bsc-service'
 import EmailService from '@/lib/email-service'
 
@@ -163,7 +163,35 @@ export async function POST(request: NextRequest) {
       // The admin can manually collect the USDT later if needed
     }
 
-    // TODO: Send success email notification
+    // Send success email notification
+    try {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single()
+
+      // Get user email from auth
+      const { data: authUser } = await (supabaseAdmin.auth as any).admin.getUserById(userId)
+
+      if (userProfile && authUser.user?.email) {
+        const emailService = new EmailService()
+        await emailService.sendDepositNotification(
+          authUser.user.email,
+          userProfile.full_name || 'User',
+          parseFloat(netAmount.toString()),
+          'USDT',
+          'success',
+          txHash,
+          parseFloat(fee.toString()),
+          parseFloat(netAmount.toString())
+        )
+        console.log("Deposit success email sent")
+      }
+    } catch (emailError) {
+      console.error("Failed to send deposit success email:", emailError)
+      // Don't fail the transaction if email fails
+    }
 
     return NextResponse.json({
       success: true,
@@ -176,8 +204,8 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("Error processing BSC deposit:", error)
     
-    // TODO: Send failure email notification
-    
+    // TODO: Send failure email notification (need user email from auth)
+
     return NextResponse.json({ error: error.message || "Failed to process deposit" }, { status: 500 })
   }
 }

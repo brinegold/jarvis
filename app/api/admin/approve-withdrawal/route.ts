@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server'
 import BSCService from '@/lib/bsc-service'
+import EmailService from '@/lib/email-service'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -88,6 +89,60 @@ export async function POST(request: NextRequest) {
 
         const netAmount = withdrawal.amount - withdrawalFee;
 
+        // Send approval success email notification
+        try {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', withdrawal.user_id)
+            .single()
+
+          // Get user email from auth - with debugging
+          console.log("Attempting to get user email for ID:", withdrawal.user_id)
+          
+          let userEmail = null
+          try {
+            const { data: authUser } = await (supabaseAdmin.auth as any).admin.getUserById(withdrawal.user_id)
+            console.log("Auth user data:", authUser)
+            userEmail = authUser?.user?.email
+          } catch (authError) {
+            console.error("Failed to get user from auth:", authError)
+            
+            // Fallback: try to get email from profiles table if it exists
+            const { data: profileWithEmail } = await supabase
+              .from('profiles')
+              .select('email')
+              .eq('id', withdrawal.user_id)
+              .single()
+            
+            userEmail = profileWithEmail?.email
+            console.log("Fallback email from profiles:", userEmail)
+          }
+
+          if (userProfile) {
+            // Use found email or skip if no email available
+            if (userEmail) {
+              const emailService = new EmailService()
+              console.log("Sending email to:", userEmail)
+              await emailService.sendWithdrawalNotification(
+                userEmail,
+                userProfile.full_name || 'User',
+                withdrawal.amount,
+                'USDT',
+                'success',
+                withdrawal.wallet_address,
+                `Your withdrawal of ${withdrawal.amount} USDT has been approved and processed successfully. Net amount: ${netAmount} USDT (after 10% fee). Transaction Hash: ${withdrawalResult.userTransferTx}`
+              )
+              console.log("Withdrawal approval email sent successfully")
+            } else {
+              console.log("No email found for user:", withdrawal.user_id, "- skipping email notification")
+            }
+          }
+        } catch (emailError) {
+          console.error("Failed to send withdrawal approval email:", emailError)
+          // Don't fail the approval if email fails
+        }
+
         return NextResponse.json({
           success: true,
           message: 'Withdrawal approved and processed on blockchain',
@@ -106,6 +161,21 @@ export async function POST(request: NextRequest) {
           p_admin_notes: `Blockchain processing failed: ${error.message}`
         })
 
+        // Send failure email notification
+        try {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', withdrawal.user_id)
+            .single()
+
+          if (userProfile) {
+            console.log("Withdrawal failed - email notification skipped (user email retrieval needs to be implemented)")
+          }
+        } catch (emailError) {
+          console.error("Failed to send withdrawal failure email:", emailError)
+        }
+
         return NextResponse.json({ 
           error: `Withdrawal processing failed: ${error.message}`,
           details: 'The withdrawal has been automatically rejected due to blockchain processing failure'
@@ -120,6 +190,21 @@ export async function POST(request: NextRequest) {
       })
 
       if (rejectionError) throw rejectionError
+
+      // Send rejection email notification
+      try {
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', withdrawal.user_id)
+          .single()
+
+        if (userProfile) {
+          console.log("Withdrawal rejected - email notification skipped (user email retrieval needs to be implemented)")
+        }
+      } catch (emailError) {
+        console.error("Failed to send withdrawal rejection email:", emailError)
+      }
 
       return NextResponse.json({
         success: true,

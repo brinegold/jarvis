@@ -78,7 +78,34 @@ export async function POST(request: NextRequest) {
 
     console.log("Withdrawal request created successfully - awaiting admin approval")
 
-    // TODO: Send pending withdrawal email notification
+    // Send pending withdrawal email notification
+    try {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single()
+
+      // Get user email from auth
+      const { data: authUser } = await (supabaseAdmin.auth as any).admin.getUserById(userId)
+
+      if (userProfile && authUser.user?.email) {
+        const emailService = new EmailService()
+        await emailService.sendWithdrawalNotification(
+          authUser.user.email,
+          userProfile.full_name || 'User',
+          parseFloat(amount.toString()),
+          'USDT',
+          'pending',
+          walletAddress,
+          `Your withdrawal request of ${amount} USDT to ${walletAddress} has been submitted and is awaiting admin approval.`
+        )
+        console.log("Withdrawal pending email sent")
+      }
+    } catch (emailError) {
+      console.error("Failed to send withdrawal pending email:", emailError)
+      // Don't fail the transaction if email fails
+    }
 
     return NextResponse.json({
       success: true,
@@ -143,7 +170,34 @@ export async function PUT(request: NextRequest) {
           })
           .eq('id', transactionId)
 
-        // TODO: Send successful withdrawal email notification
+        // Send successful withdrawal email notification
+        try {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', transaction.user_id)
+            .single()
+
+          // Get user email from auth
+          const { data: authUser } = await (supabaseAdmin.auth as any).admin.getUserById(transaction.user_id)
+
+          if (userProfile && authUser.user?.email) {
+            const emailService = new EmailService()
+            await emailService.sendWithdrawalNotification(
+              authUser.user.email,
+              userProfile.full_name || 'User',
+              parseFloat(transaction.amount.toString()),
+              'USDT',
+              'success',
+              walletAddress || transaction.description.match(/to (\w+)/)?.[1] || '',
+              `Your withdrawal of ${transaction.amount} USDT has been processed successfully and sent to your wallet.`
+            )
+            console.log("Withdrawal success email sent")
+          }
+        } catch (emailError) {
+          console.error("Failed to send withdrawal success email:", emailError)
+          // Don't fail the transaction if email fails
+        }
 
         return NextResponse.json({
           success: true,
@@ -163,7 +217,33 @@ export async function PUT(request: NextRequest) {
             p_blockchain_tx_hash: null
           })
 
-        // TODO: Send failed withdrawal email notification
+        // Send failed withdrawal email notification
+        try {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', transaction.user_id)
+            .single()
+
+          // Get user email from auth
+          const { data: authUser } = await (supabaseAdmin.auth as any).admin.getUserById(transaction.user_id)
+
+          if (userProfile && authUser.user?.email) {
+            const emailService = new EmailService()
+            await emailService.sendWithdrawalNotification(
+              authUser.user.email,
+              userProfile.full_name || 'User',
+              parseFloat(transaction.amount.toString()),
+              'USDT',
+              'failed',
+              walletAddress || transaction.description.match(/to (\w+)/)?.[1] || '',
+              `Your withdrawal of ${transaction.amount} USDT failed to process. The amount has been refunded to your account.`
+            )
+            console.log("Withdrawal failure email sent")
+          }
+        } catch (emailError) {
+          console.error("Failed to send withdrawal failure email:", emailError)
+        }
 
         return NextResponse.json({ error: `Withdrawal processing failed: ${txError.message}` }, { status: 500 })
       }
@@ -181,7 +261,33 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to reject withdrawal' }, { status: 500 })
       }
 
-      // TODO: Send withdrawal rejection email notification
+      // Send withdrawal rejection email notification
+      try {
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', transaction.user_id)
+          .single()
+
+        // Get user email from auth
+        const { data: authUser } = await (supabaseAdmin.auth as any).admin.getUserById(transaction.user_id)
+
+        if (userProfile && authUser.user?.email) {
+          const emailService = new EmailService()
+          await emailService.sendWithdrawalNotification(
+            authUser.user.email,
+            userProfile.full_name || 'User',
+            parseFloat(transaction.amount.toString()),
+            'USDT',
+            'failed',
+            walletAddress || transaction.description.match(/to (\w+)/)?.[1] || '',
+            `Your withdrawal request of ${transaction.amount} USDT was rejected by admin. The amount has been refunded to your account.`
+          )
+          console.log("Withdrawal rejection email sent")
+        }
+      } catch (emailError) {
+        console.error("Failed to send withdrawal rejection email:", emailError)
+      }
 
       return NextResponse.json({
         success: true,
