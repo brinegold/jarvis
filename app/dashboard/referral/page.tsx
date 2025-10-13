@@ -11,6 +11,8 @@ import { dualReferralService } from '@/lib/referralService'
 interface Profile {
   referral_code: string
   full_name: string
+  sponsor_id: string | null
+  sponsor_name?: string
 }
 
 interface ReferralStats {
@@ -63,14 +65,28 @@ export default function ReferralPage() {
 
   const fetchData = async () => {
     try {
-      // Fetch profile
+      // Fetch profile with sponsor information
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('referral_code, full_name')
+        .select('referral_code, full_name, sponsor_id')
         .eq('id', user?.id)
         .single()
 
       if (profileError) throw profileError
+
+      // If user has a sponsor, fetch sponsor's name
+      if (profileData.sponsor_id) {
+        const { data: sponsorData, error: sponsorError } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('referral_code', profileData.sponsor_id)
+          .single()
+
+        if (!sponsorError && sponsorData) {
+          (profileData as any).sponsor_name = sponsorData.full_name
+        }
+      }
+
       setProfile(profileData)
 
       // Fetch dual referral stats using the new service
@@ -227,6 +243,29 @@ export default function ReferralPage() {
               Share
             </button>
           </div>
+        </div>
+
+        {/* Upline Information */}
+        <div className="jarvis-card rounded-2xl p-6 mb-6">
+          <h3 className="text-white font-bold text-lg mb-4 flex items-center">
+            <Users className="h-6 w-6 mr-2 text-blue-400" />
+            Your Upline
+          </h3>
+          
+          {profile?.sponsor_id ? (
+            <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-4">
+              <p className="text-center text-white font-semibold">
+                Referred by: {(profile as any)?.sponsor_name || 'Loading...'}
+              </p>
+              <p className="text-center text-gray-300 text-sm mt-1">
+                Sponsor ID: {profile.sponsor_id}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white/10 rounded-lg p-4 text-center">
+              <p className="text-gray-300">No upline (you are a top-level member)</p>
+            </div>
+          )}
         </div>
 
         {/* Commission Structure */}

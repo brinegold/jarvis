@@ -424,7 +424,7 @@ export default function DashboardPage() {
               {/* Existing buttons */}
       
               <a 
-                href="mailto:support@jarvisstaking.com" 
+                href="mailto:support@jarvisstaking.live" 
                 className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-full"
                 title="Email us"
               >

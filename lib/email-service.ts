@@ -309,6 +309,10 @@ class EmailService {
     }
   }
 
+  private formatNumber(num: number): string {
+    return num.toFixed(2)
+  }
+
   private getTransactionContent(data: TransactionEmailData): string {
     const { transactionType, status, amount, currency } = data
 
@@ -318,35 +322,35 @@ class EmailService {
           return `
             <div class="transaction-summary">
               <div class="summary-title">Deposit Confirmation</div>
-              <p>Your deposit of <strong>${amount} ${currency}</strong> has been successfully processed and added to your account.</p>
+              <p>Your deposit of <strong>${this.formatNumber(amount)} ${currency}</strong> has been successfully processed and added to your account.</p>
             </div>
           `
         case 'withdrawal':
           return `
             <div class="transaction-summary">
               <div class="summary-title">Withdrawal Confirmation</div>
-              <p>Your withdrawal request of <strong>${amount} ${currency}</strong> has been successfully processed.</p>
+              <p>Your withdrawal request of <strong>${this.formatNumber(amount)} ${currency}</strong> has been successfully processed.</p>
             </div>
           `
         case 'transfer':
           return `
             <div class="transaction-summary">
               <div class="summary-title">Transfer Confirmation</div>
-              <p>Your transfer of <strong>${amount} ${currency}</strong> has been completed successfully.</p>
+              <p>Your transfer of <strong>${this.formatNumber(amount)} ${currency}</strong> has been completed successfully.</p>
             </div>
           `
         case 'staking':
           return `
             <div class="transaction-summary">
               <div class="summary-title">Staking Confirmation</div>
-              <p>Your staking transaction of <strong>${amount} ${currency}</strong> has been activated successfully.</p>
+              <p>Your staking transaction of <strong>${this.formatNumber(amount)} ${currency}</strong> has been activated successfully.</p>
             </div>
           `
         case 'jrc_purchase':
           return `
             <div class="transaction-summary">
               <div class="summary-title">JRC Purchase Confirmation</div>
-              <p>Your JRC token purchase of <strong>${amount} ${currency}</strong> has been completed successfully.</p>
+              <p>Your JRC token purchase of <strong>${this.formatNumber(amount)} ${currency}</strong> has been completed successfully.</p>
             </div>
           `
       }
@@ -354,7 +358,7 @@ class EmailService {
       return `
         <div class="additional-info" style="border-left: 4px solid #e74c3c;">
           <h4>Transaction Failed</h4>
-          <p>Your ${transactionType} request of <strong>${amount} ${currency}</strong> has failed.</p>
+          <p>Your ${transactionType} request of <strong>${this.formatNumber(amount)} ${currency}</strong> has failed.</p>
           ${data.errorMessage ? `<p><strong>Reason:</strong> ${data.errorMessage}</p>` : ''}
           <p>Please try again or contact support if the issue persists.</p>
         </div>
@@ -363,7 +367,7 @@ class EmailService {
       return `
         <div class="additional-info" style="border-left: 4px solid #f39c12;">
           <h4>Transaction Processing</h4>
-          <p>Your ${transactionType} request of <strong>${amount} ${currency}</strong> is currently being processed.</p>
+          <p>Your ${transactionType} request of <strong>${this.formatNumber(amount)} ${currency}</strong> is currently being processed.</p>
           <p>We will notify you once the transaction is completed.</p>
         </div>
       `
@@ -380,7 +384,7 @@ class EmailService {
       </div>
       <div class="detail-row">
         <span class="detail-label">Amount:</span>
-        <span class="detail-value">${data.amount} ${data.currency}</span>
+        <span class="detail-value">${this.formatNumber(data.amount)} ${data.currency}</span>
       </div>
       <div class="detail-row">
         <span class="detail-label">Status:</span>
@@ -414,7 +418,7 @@ class EmailService {
       details += `
         <div class="detail-row">
           <span class="detail-label">Fee:</span>
-          <span class="detail-value">${data.fee} ${data.currency}</span>
+          <span class="detail-value">${this.formatNumber(data.fee)} ${data.currency}</span>
         </div>
       `
     }
@@ -423,7 +427,7 @@ class EmailService {
       details += `
         <div class="detail-row">
           <span class="detail-label">Net Amount:</span>
-          <span class="detail-value">${data.netAmount} ${data.currency}</span>
+          <span class="detail-value">${this.formatNumber(data.netAmount)} ${data.currency}</span>
         </div>
       `
     }
@@ -459,7 +463,7 @@ class EmailService {
       details += `
         <div class="detail-row">
           <span class="detail-label">Daily Percentage:</span>
-          <span class="detail-value">${data.dailyPercentage}%</span>
+          <span class="detail-value">${this.formatNumber(data.dailyPercentage)}%</span>
         </div>
       `
     }
