@@ -202,7 +202,7 @@ export default function SignUpPage() {
 
             <div>
               <label className="block text-white text-sm font-medium mb-2">
-                Full Name
+                Username
               </label>
               <input
                 type="text"
@@ -211,7 +211,7 @@ export default function SignUpPage() {
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter your full name"
+                placeholder="Enter your Username"
               />
             </div>
 

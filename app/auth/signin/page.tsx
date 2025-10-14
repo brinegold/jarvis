@@ -97,7 +97,7 @@ export default function SignInPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-white text-sm font-medium mb-2">
-                Username
+                Email
               </label>
               <input
                 type="email"
