@@ -25,7 +25,6 @@ import { useOptimizedData } from '@/hooks/useOptimizedData'
 // Lazy load heavy components
 const IncomeModal = lazy(() => import('@/components/dashboard/IncomeModal'))
 const JrcPurchaseModal = lazy(() => import('@/components/dashboard/JrcPurchaseModal'))
-const DashboardSkeleton = lazy(() => import('@/components/dashboard/DashboardSkeleton'))
 
 interface Profile {
   id: string
@@ -78,7 +77,7 @@ export default function DashboardPage() {
   const [jrcStakingPlans, setJrcStakingPlans] = useState<JrcStakingPlan[]>([])
   const [totalJrcEarned, setTotalJrcEarned] = useState(0)
   const [loadingData, setLoadingData] = useState(true)
-  const [showSkeleton, setShowSkeleton] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(false) // Always false - no skeleton
   const [showJrcModal, setShowJrcModal] = useState(false)
   const [jrcAmount, setJrcAmount] = useState('')
   const [jrcPurchasing, setJrcPurchasing] = useState(false)
@@ -210,8 +209,7 @@ export default function DashboardPage() {
       console.error('Error fetching user data:', error)
     } finally {
       setLoadingData(false)
-      // Hide skeleton after a short delay to ensure smooth transition
-      setTimeout(() => setShowSkeleton(false), 300)
+      // No skeleton delay - dashboard renders immediately
     }
   }
 
@@ -350,19 +348,7 @@ export default function DashboardPage() {
     }
   }
 
-  // Show skeleton only on initial load or when user is loading
-  if (loading || (loadingData && showSkeleton)) {
-    return (
-      <Suspense fallback={
-        <div className="min-h-screen jarvis-gradient flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
-        </div>
-      }>
-        <DashboardSkeleton />
-      </Suspense>
-    )
-  }
-
+  // No loading state - dashboard renders immediately
   if (!user || !profile) {
     return null
   }
