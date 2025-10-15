@@ -6,7 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "analyze": "cross-env ANALYZE=true next build",
+    "build:analyze": "npm run build && npm run analyze",
+    "lighthouse": "lighthouse http://localhost:3000 --output html --output-path ./lighthouse-report.html",
+    "perf:unix": "npm run build && npm run start & sleep 5 && npm run lighthouse",
+    "perf:win": "npm run build && start /b npm run start && timeout /t 5 && npm run lighthouse",
+    "perf": "npm run perf:win",
+    "test:build": "node scripts/test-build.js"
   },
   "dependencies": {
     "@radix-ui/react-tabs": "^1.1.13",
@@ -23,6 +30,7 @@
     "react-dom": "^18",
     "react-icons": "^4.12.0",
     "recharts": "^2.8.0",
+    "swr": "^2.3.6",
     "tailwindcss": "^3.3.6",
     "web3": "^4.16.0",
     "web3-eth-contract": "^4.1.2"
@@ -32,8 +40,12 @@
     "@types/nodemailer": "^6.4.14",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "cross-env": "^7.0.3",
+    "critters": "^0.0.20",
     "eslint": "^8",
     "eslint-config-next": "14.0.3",
-    "typescript": "^5"
+    "lighthouse": "^11.4.0",
+    "typescript": "^5",
+    "webpack-bundle-analyzer": "^4.10.2"
   }
 }

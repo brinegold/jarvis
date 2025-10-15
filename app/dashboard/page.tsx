@@ -1,25 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import { 
-  Bot, 
   Wallet, 
   TrendingUp, 
   Users, 
   ArrowUpRight, 
   ArrowDownLeft,
-  Eye,
   Send,
   Coins,
-  Gift,
-  History,
-  Settings,
-  LogOut,
-  XCircle,
-  MessageCircle,
   Youtube,
   Mail,
   Send as Telegram
@@ -28,6 +20,12 @@ import Link from 'next/link'
 import Image from 'next/image'
 import DockNavbar from '@/components/DockNavbar'
 import { dualReferralService } from '@/lib/referralService'
+import { useOptimizedData } from '@/hooks/useOptimizedData'
+
+// Lazy load heavy components
+const IncomeModal = lazy(() => import('@/components/dashboard/IncomeModal'))
+const JrcPurchaseModal = lazy(() => import('@/components/dashboard/JrcPurchaseModal'))
+const DashboardSkeleton = lazy(() => import('@/components/dashboard/DashboardSkeleton'))
 
 interface Profile {
   id: string
@@ -80,6 +78,7 @@ export default function DashboardPage() {
   const [jrcStakingPlans, setJrcStakingPlans] = useState<JrcStakingPlan[]>([])
   const [totalJrcEarned, setTotalJrcEarned] = useState(0)
   const [loadingData, setLoadingData] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(true)
   const [showJrcModal, setShowJrcModal] = useState(false)
   const [jrcAmount, setJrcAmount] = useState('')
   const [jrcPurchasing, setJrcPurchasing] = useState(false)
@@ -211,6 +210,8 @@ export default function DashboardPage() {
       console.error('Error fetching user data:', error)
     } finally {
       setLoadingData(false)
+      // Hide skeleton after a short delay to ensure smooth transition
+      setTimeout(() => setShowSkeleton(false), 300)
     }
   }
 
@@ -349,11 +350,16 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading || loadingData) {
+  // Show skeleton only on initial load or when user is loading
+  if (loading || (loadingData && showSkeleton)) {
     return (
-      <div className="min-h-screen jarvis-gradient flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
-      </div>
+      <Suspense fallback={
+        <div className="min-h-screen jarvis-gradient flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
+        </div>
+      }>
+        <DashboardSkeleton />
+      </Suspense>
     )
   }
 
@@ -378,7 +384,9 @@ export default function DashboardPage() {
                 className="!h-24 !w-24 sm:!h-32 sm:!w-32"
                 style={{ width: '96px', height: '96px' }}
                 priority
-                unoptimized={process.env.NODE_ENV === 'development'}
+                quality={75}
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
               />
               <span className="text-lg sm:text-2xl font-bold text-white">Jarvis Staking</span>
             </div>
@@ -661,253 +669,29 @@ export default function DashboardPage() {
       {/* Dock Navigation */}
       <DockNavbar onSignOut={handleSignOut} />
 
-      {/* Income Details Modal */}
-      {showIncomeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 sm:p-4 z-50">
-          <div className="jarvis-card rounded-xl sm:rounded-2xl p-4 sm:p-6 max-w-2xl w-full max-h-[85vh] sm:max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h3 className="text-lg sm:text-2xl font-bold text-white">
-                {selectedIncomeType === 'trade' && 'Trade Income Details'}
-                {selectedIncomeType === 'referral' && 'Referral Commission Details'}
-                {selectedIncomeType === 'tokens' && 'Token Transaction Details'}
-                {selectedIncomeType === 'rewards' && 'Reward Income Details'}
-                {selectedIncomeType === 'staking' && 'Staking Income Details'}
-                {selectedIncomeType === 'staking-referral' && 'JRC Staking Reward Details'}
-              </h3>
-              <button
-                onClick={() => setShowIncomeModal(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-              </button>
-            </div>
-            
-            <div className="space-y-3 sm:space-y-4">
-              {incomeData.length === 0 ? (
-                <div className="text-center py-6 sm:py-8">
-                  <p className="text-gray-300 text-sm sm:text-base">No data available for this income type</p>
-                </div>
-              ) : (
-                incomeData.map((item, index) => (
-                  <div key={index} className="bg-white/5 rounded-lg p-3 sm:p-4 border border-white/10">
-                    {selectedIncomeType === 'trade' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
-                        <div>
-                          <p className="text-gray-400">Plan Type</p>
-                          <p className="text-white font-semibold">Plan {item.plan_type}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Investment Amount</p>
-                          <p className="text-white">${item.investment_amount?.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Daily Percentage</p>
-                          <p className="text-green-400">{item.daily_percentage}%</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Date</p>
-                          <p className="text-white">{new Date(item.created_at).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {selectedIncomeType === 'referral' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
-                        <div>
-                          <p className="text-gray-400">Commission Amount</p>
-                          <p className="text-white font-semibold">${item.commission_amount?.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Level</p>
-                          <p className="text-white">Level {item.level}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Commission %</p>
-                          <p className="text-green-400">{item.commission_percentage}%</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Date</p>
-                          <p className="text-white">{new Date(item.created_at).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {selectedIncomeType === 'tokens' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
-                        <div>
-                          <p className="text-gray-400">Transaction Type</p>
-                          <p className="text-white font-semibold capitalize">{item.transaction_type?.replace('_', ' ')}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Amount</p>
-                          <p className="text-yellow-400">{item.amount} JRC</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Status</p>
-                          <p className="text-green-400 capitalize">{item.status}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Date</p>
-                          <p className="text-white">{new Date(item.created_at).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                    )}
+      {/* Income Details Modal - Lazy Loaded */}
+      <Suspense fallback={null}>
+        <IncomeModal
+          showIncomeModal={showIncomeModal}
+          setShowIncomeModal={setShowIncomeModal}
+          selectedIncomeType={selectedIncomeType}
+          incomeData={incomeData}
+        />
+      </Suspense>
 
-                    {selectedIncomeType === 'staking-referral' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
-                        <div>
-                          <p className="text-gray-400">Staking Amount</p>
-                          <p className="text-white font-semibold">{item.amount} JRC</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Staking Period</p>
-                          <p className="text-white">{item.staking_period} days</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Daily Percentage</p>
-                          <p className="text-green-400">{item.daily_percentage}%</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Total Earned</p>
-                          <p className="text-yellow-400">{item.total_profit_earned?.toFixed(2)} JRC</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Status</p>
-                          <p className={`capitalize ${item.status === 'active' ? 'text-green-400' : item.status === 'completed' ? 'text-blue-400' : 'text-gray-400'}`}>
-                            {item.status}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Start Date</p>
-                          <p className="text-white">{new Date(item.start_date).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">End Date</p>
-                          <p className="text-white">{new Date(item.end_date).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Rewards Claimed</p>
-                          <p className="text-purple-400">{item.rewards_claimed?.toFixed(2)} JRC</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* JRC Purchase Modal */}
-      {showJrcModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 sm:p-4 z-50">
-          <div className="jarvis-card rounded-xl sm:rounded-2xl p-4 sm:p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h3 className="text-lg sm:text-2xl font-bold text-white flex items-center">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mr-2 sm:mr-3">
-                  <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-                </div>
-                Buy JRC Coins
-              </h3>
-              <button
-                onClick={() => {
-                  setShowJrcModal(false)
-                  setJrcAmount('')
-                  setJrcError('')
-                  setJrcSuccess('')
-                }}
-                className="text-gray-400 hover:text-white"
-              >
-                <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-              </button>
-            </div>
-
-            {/* Current Rate */}
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
-              <div className="text-center">
-                <p className="text-blue-400 font-semibold text-sm sm:text-base">Current Rate</p>
-                <p className="text-xl sm:text-2xl font-bold text-white">$0.10 per JRC</p>
-                <p className="text-gray-300 text-xs sm:text-sm">1 JRC = $0.10 USDT</p>
-              </div>
-            </div>
-
-            {/* Available Balance */}
-            <div className="bg-green-500/10 rounded-lg p-3 mb-3 sm:mb-4">
-              <p className="text-gray-300 text-xs sm:text-sm">Available Fund Wallet Balance</p>
-              <p className="text-lg sm:text-xl font-bold text-green-400">${profile?.fund_wallet_balance?.toFixed(2) || '0.00'}</p>
-            </div>
-
-            {jrcError && (
-              <div className="bg-red-500/20 border border-red-500 text-red-200 px-3 py-2 sm:px-4 sm:py-3 rounded-lg mb-3 sm:mb-4 text-sm">
-                {jrcError}
-              </div>
-            )}
-
-            {jrcSuccess && (
-              <div className="bg-green-500/20 border border-green-500 text-green-200 px-3 py-2 sm:px-4 sm:py-3 rounded-lg mb-3 sm:mb-4 text-sm">
-                {jrcSuccess}
-              </div>
-            )}
-
-            {/* Purchase Form */}
-            <div className="space-y-3 sm:space-y-4">
-              <div>
-                <label className="block text-white text-xs sm:text-sm font-medium mb-2">
-                  JRC Coins to Purchase
-                </label>
-                <input
-                  type="number"
-                  value={jrcAmount}
-                  onChange={(e) => setJrcAmount(e.target.value)}
-                  placeholder="Enter amount of JRC coins"
-                  min="1"
-                  step="1"
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
-                />
-                {jrcAmount && (
-                  <p className="text-gray-300 text-xs sm:text-sm mt-2">
-                    Total Cost: ${(parseFloat(jrcAmount) * 0.1).toFixed(2)} USDT
-                  </p>
-                )}
-              </div>
-
-              {/* Quick Amount Buttons */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[100, 500, 1000, 5000].map((amount) => (
-                  <button
-                    key={amount}
-                    onClick={() => setJrcAmount(amount.toString())}
-                    className="px-2 py-1.5 sm:px-3 sm:py-2 bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm rounded-lg transition-colors"
-                  >
-                    {amount.toLocaleString()}
-                  </button>
-                ))}
-              </div>
-
-              {/* Purchase Button */}
-              <button
-                onClick={handleJrcPurchase}
-                disabled={jrcPurchasing || !jrcAmount || parseFloat(jrcAmount) <= 0}
-                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed py-2.5 sm:py-3 rounded-lg text-white font-semibold transition-colors text-sm sm:text-base"
-              >
-                {jrcPurchasing ? 'Processing...' : 'Purchase JRC Coins'}
-              </button>
-            </div>
-
-            {/* Purchase Info */}
-            <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <h4 className="text-yellow-400 font-semibold mb-2 text-sm sm:text-base">Purchase Information</h4>
-              <ul className="text-yellow-200 text-xs sm:text-sm space-y-1">
-                <li>• Tokens are purchased instantly</li>
-                <li>• Funds are deducted from your Fund Wallet</li>
-                <li>• JRC coins are added to your coin balance</li>
-                <li>• Rate: $0.10 per JRC coin</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* JRC Purchase Modal - Lazy Loaded */}
+      <Suspense fallback={null}>
+        <JrcPurchaseModal
+          showJrcModal={showJrcModal}
+          setShowJrcModal={setShowJrcModal}
+          jrcAmount={jrcAmount}
+          setJrcAmount={setJrcAmount}
+          jrcPurchasing={jrcPurchasing}
+          jrcError={jrcError}
+          jrcSuccess={jrcSuccess}
+          handleJrcPurchase={handleJrcPurchase}
+        />
+      </Suspense>
     </div>
   )
 }

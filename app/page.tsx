@@ -1,11 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Bot, TrendingUp, Shield, Users, ArrowRight, Star } from 'lucide-react'
+import { TrendingUp, Shield, Users, ArrowRight } from 'lucide-react'
+
+// Lazy load heavy components
+const LazyFeatureSection = lazy(() => import('@/components/FeatureSection'))
+const LazyTokenInfo = lazy(() => import('@/components/TokenInfo'))
 
 export default function HomePage() {
   const { user, loading } = useAuth()
@@ -51,7 +55,9 @@ export default function HomePage() {
               className="!w-32 !h-32"
               style={{ width: '128px', height: '128px' }}
               priority
-              unoptimized={process.env.NODE_ENV === 'development'}
+              quality={85}
+              placeholder="blur"
+              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
             />
           </div>
           <div className="flex items-center space-x-4">
@@ -125,52 +131,19 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Token Information */}
-          <div className="jarvis-card rounded-2xl p-8 mb-16">
-            <h3 className="text-2xl font-bold text-white mb-4">Jarvis Token Information</h3>
-            <div className="grid md:grid-cols-2 gap-8 text-left">
-              <div>
-                <h4 className="text-lg font-semibold text-blue-400 mb-2">Current Price</h4>
-                <p className="text-3xl font-bold text-white">$0.1 per Token</p>
-              </div>
-              <div>
-                <h4 className="text-lg font-semibold text-purple-400 mb-2">Future Listing Price</h4>
-                <p className="text-3xl font-bold text-white">$3.0 per Token</p>
-              </div>
-            </div>
-            <div className="mt-6 p-4 bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg">
-              <p className="text-center text-white">
-                🚀 <strong>Potential 30x Growth!</strong> Get in early and secure your Jarvis Tokens at the current discounted price.
-              </p>
-            </div>
-          </div>
+          {/* Token Information - Lazy Loaded */}
+          <Suspense fallback={<div className="jarvis-card rounded-2xl p-8 mb-16 animate-pulse bg-white/5 h-48"></div>}>
+            <LazyTokenInfo />
+          </Suspense>
 
-          {/* Features */}
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="bg-green-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Daily Profits</h3>
-              <p className="text-gray-300">Earn consistent daily returns on your investment with automated profit distribution.</p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-blue-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-2">10-Level Referrals</h3>
-              <p className="text-gray-300">Earn up to 15% commission from your referrals across 10 levels of depth.</p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-purple-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Secure Platform</h3>
-              <p className="text-gray-300">Built with enterprise-grade security and automated transaction processing.</p>
-            </div>
-          </div>
+          {/* Features - Lazy Loaded */}
+          <Suspense fallback={<div className="grid md:grid-cols-3 gap-8 animate-pulse">
+            <div className="bg-white/5 h-48 rounded-lg"></div>
+            <div className="bg-white/5 h-48 rounded-lg"></div>
+            <div className="bg-white/5 h-48 rounded-lg"></div>
+          </div>}>
+            <LazyFeatureSection />
+          </Suspense>
         </div>
       </main>
 

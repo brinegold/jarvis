@@ -1,0 +1,25 @@
+{
+  "name": "Jarvis Staking - Smart Crypto Growth Platform",
+  "short_name": "Jarvis Staking",
+  "description": "Revolutionary cryptocurrency investment platform offering secure, decentralized alternatives to traditional money.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo_32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo_300x300.png",
+      "sizes": "300x300",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["finance", "business", "productivity"],
+  "lang": "en",
+  "dir": "ltr"
+}
