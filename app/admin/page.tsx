@@ -25,6 +25,8 @@ interface AdminStats {
   pendingWithdrawals: number
   totalWithdrawals: number
   totalInvestments: number
+  totalTransactions: number
+  dailyTransactions: number
 }
 
 interface PendingWithdrawal {
@@ -44,7 +46,9 @@ export default function AdminDashboard() {
     totalUsers: 0,
     pendingWithdrawals: 0,
     totalWithdrawals: 0,
-    totalInvestments: 0
+    totalInvestments: 0,
+    totalTransactions: 0,
+    dailyTransactions: 0
   })
   const [pendingWithdrawals, setPendingWithdrawals] = useState<PendingWithdrawal[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
@@ -89,11 +93,20 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       // Fetch stats
-      const [usersCount, withdrawalsData, investmentsData] = await Promise.all([
+      const [usersCount, withdrawalsData, investmentsData, transactionsData] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact' }),
         supabase.from('withdrawal_requests').select('*'),
-        supabase.from('investment_plans').select('investment_amount')
+        supabase.from('investment_plans').select('investment_amount'),
+        supabase.from('transactions').select('created_at', { count: 'exact' })
       ])
+
+      // Calculate daily transactions (today)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const { count: dailyTransactionsCount } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact' })
+        .gte('created_at', today.toISOString())
 
       const pendingWithdrawalsCount = withdrawalsData.data?.filter(w => w.status === 'pending').length || 0
       const totalWithdrawalsAmount = withdrawalsData.data?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0
@@ -103,7 +116,9 @@ export default function AdminDashboard() {
         totalUsers: usersCount.count || 0,
         pendingWithdrawals: pendingWithdrawalsCount,
         totalWithdrawals: totalWithdrawalsAmount,
-        totalInvestments: totalInvestmentsAmount
+        totalInvestments: totalInvestmentsAmount,
+        totalTransactions: transactionsData.count || 0,
+        dailyTransactions: dailyTransactionsCount || 0
       })
 
       // Fetch pending withdrawals with user details
@@ -309,7 +324,7 @@ export default function AdminDashboard() {
 
       <div className="container mx-auto p-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
           <div className="jarvis-card rounded-2xl p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -349,6 +364,26 @@ export default function AdminDashboard() {
               <TrendingUp className="h-12 w-12 text-purple-400" />
             </div>
           </div>
+
+          <div className="jarvis-card rounded-2xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-300 text-sm">Total Transactions</p>
+                <p className="text-3xl font-bold text-cyan-400">{stats.totalTransactions.toLocaleString()}</p>
+              </div>
+              <CreditCard className="h-12 w-12 text-cyan-400" />
+            </div>
+          </div>
+
+          <div className="jarvis-card rounded-2xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-300 text-sm">Today's Transactions</p>
+                <p className="text-3xl font-bold text-orange-400">{stats.dailyTransactions}</p>
+              </div>
+              <Coins className="h-12 w-12 text-orange-400" />
+            </div>
+          </div>
         </div>
 
         {/* Navigation Tabs */}
@@ -364,6 +399,12 @@ export default function AdminDashboard() {
             className="jarvis-card px-6 py-3 rounded-lg text-white font-semibold hover:bg-white/10"
           >
             Manage Users
+          </Link>
+          <Link 
+            href="/admin/transactions"
+            className="jarvis-card px-6 py-3 rounded-lg text-white font-semibold hover:bg-white/10"
+          >
+            View Transactions
           </Link>
           <Link 
             href="/admin/investments"

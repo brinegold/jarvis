@@ -17,7 +17,10 @@ import {
   Wallet,
   TrendingUp,
   Plus,
-  DollarSign
+  DollarSign,
+  Minus,
+  Coins,
+  UserMinus
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -54,6 +57,22 @@ export default function UsersManagement() {
   const [addFundsAmount, setAddFundsAmount] = useState('')
   const [addFundsNotes, setAddFundsNotes] = useState('')
   const [isAddingFunds, setIsAddingFunds] = useState(false)
+  
+  // Deduct Funds Modal State
+  const [showDeductFundsModal, setShowDeductFundsModal] = useState(false)
+  const [deductFundsUser, setDeductFundsUser] = useState<UserProfile | null>(null)
+  const [deductFundsAmount, setDeductFundsAmount] = useState('')
+  const [deductFundsNotes, setDeductFundsNotes] = useState('')
+  const [isDeductingFunds, setIsDeductingFunds] = useState(false)
+  
+  // Jarvis Token Management Modal State
+  const [showJarvisModal, setShowJarvisModal] = useState(false)
+  const [jarvisUser, setJarvisUser] = useState<UserProfile | null>(null)
+  const [jarvisAmount, setJarvisAmount] = useState('')
+  const [jarvisNotes, setJarvisNotes] = useState('')
+  const [jarvisAction, setJarvisAction] = useState<'add' | 'deduct'>('add')
+  const [isManagingJarvis, setIsManagingJarvis] = useState(false)
+  
   const supabase = createSupabaseClient()
 
   const checkAdminAndFetch = useCallback(async () => {
@@ -87,6 +106,28 @@ export default function UsersManagement() {
         .order('created_at', { ascending: false })
 
       if (usersError) throw usersError
+
+      // Fetch user emails from API endpoint
+      const userIds = usersData?.map(user => user.id) || []
+      let emailMap = new Map<string, { email?: string; last_sign_in_at?: string }>()
+      
+      try {
+        const emailResponse = await fetch('/api/admin/get-user-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userIds })
+        })
+        
+        if (emailResponse.ok) {
+          const emailData = await emailResponse.json()
+          emailMap = new Map(emailData.users?.map((user: any) => [
+            user.id, 
+            { email: user.email, last_sign_in_at: user.last_sign_in_at }
+          ]) || [])
+        }
+      } catch (error) {
+        console.warn('Could not fetch user emails:', error)
+      }
 
       // Fetch investment totals
       const { data: investmentData, error: investmentError } = await supabase
@@ -142,9 +183,11 @@ export default function UsersManagement() {
 
         // Process data with optimized lookups
         var processedUsers = usersData?.map(user => {
+          const authData = emailMap.get(user.id)
           return {
             ...user,
-            user_email: user.id, // Use user_id as fallback since email is in auth.users
+            user_email: authData?.email || user.id, // Use email from auth.users or fallback to user_id
+            last_sign_in_at: authData?.last_sign_in_at,
             total_investments: investmentMap.get(user.id) || 0,
             total_withdrawals: withdrawalMap.get(user.id) || 0,
             referral_count: referralCountMap.get(user.referral_code) || 0
@@ -155,9 +198,11 @@ export default function UsersManagement() {
         const referralCountMap = new Map(referralCounts?.map((rc: { referral_code: string; count: number }) => [rc.referral_code, rc.count]) || [])
         
         var processedUsers = usersData?.map(user => {
+          const authData = emailMap.get(user.id)
           return {
             ...user,
-            user_email: user.id, // Use user_id as fallback since email is in auth.users
+            user_email: authData?.email || user.id, // Use email from auth.users or fallback to user_id
+            last_sign_in_at: authData?.last_sign_in_at,
             total_investments: investmentMap.get(user.id) || 0,
             total_withdrawals: withdrawalMap.get(user.id) || 0,
             referral_count: referralCountMap.get(user.referral_code) || 0
@@ -238,7 +283,8 @@ export default function UsersManagement() {
       if (error) throw error
 
       await fetchUsers()
-      alert(`User ${action.replace('_', ' ')}ned successfully!`)
+      const actionText = action === 'remove_admin' ? 'removed admin privileges from' : action.replace('_', ' ') + 'ned'
+      alert(`User ${actionText} successfully!`)
     } catch (error) {
       console.error(`Error ${action}ning user:`, error)
       alert(`Failed to ${action} user`)
@@ -304,6 +350,135 @@ export default function UsersManagement() {
       alert('Failed to add funds. Please try again.')
     } finally {
       setIsAddingFunds(false)
+    }
+  }
+
+  // Deduct Funds Modal Functions
+  const openDeductFundsModal = (user: UserProfile) => {
+    setDeductFundsUser(user)
+    setDeductFundsAmount('')
+    setDeductFundsNotes('')
+    setShowDeductFundsModal(true)
+  }
+
+  const closeDeductFundsModal = () => {
+    setShowDeductFundsModal(false)
+    setDeductFundsUser(null)
+    setDeductFundsAmount('')
+    setDeductFundsNotes('')
+  }
+
+  const handleDeductFunds = async () => {
+    if (!deductFundsUser || !deductFundsAmount) {
+      alert('Please enter an amount')
+      return
+    }
+
+    const amount = parseFloat(deductFundsAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid positive amount')
+      return
+    }
+
+    if (amount > deductFundsUser.main_wallet_balance) {
+      alert('Cannot deduct more than the current wallet balance')
+      return
+    }
+
+    setIsDeductingFunds(true)
+    try {
+      const response = await fetch('/api/admin/deduct-funds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: deductFundsUser.id,
+          amount: amount,
+          adminNotes: deductFundsNotes || `Manual fund deduction of $${amount} by admin`
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        alert(`Successfully deducted $${amount} from ${deductFundsUser.full_name || 'user'}'s wallet!`)
+        closeDeductFundsModal()
+        await fetchUsers() // Refresh the users list
+      } else {
+        alert(`Failed to deduct funds: ${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error deducting funds:', error)
+      alert('Failed to deduct funds. Please try again.')
+    } finally {
+      setIsDeductingFunds(false)
+    }
+  }
+
+  // Jarvis Token Management Modal Functions
+  const openJarvisModal = (user: UserProfile, action: 'add' | 'deduct') => {
+    setJarvisUser(user)
+    setJarvisAmount('')
+    setJarvisNotes('')
+    setJarvisAction(action)
+    setShowJarvisModal(true)
+  }
+
+  const closeJarvisModal = () => {
+    setShowJarvisModal(false)
+    setJarvisUser(null)
+    setJarvisAmount('')
+    setJarvisNotes('')
+    setJarvisAction('add')
+  }
+
+  const handleJarvisTokens = async () => {
+    if (!jarvisUser || !jarvisAmount) {
+      alert('Please enter an amount')
+      return
+    }
+
+    const amount = parseInt(jarvisAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid positive amount')
+      return
+    }
+
+    if (jarvisAction === 'deduct' && amount > (jarvisUser.total_jarvis_tokens || 0)) {
+      alert('Cannot deduct more than the current token balance')
+      return
+    }
+
+    setIsManagingJarvis(true)
+    try {
+      const response = await fetch('/api/admin/manage-jarvis-tokens', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: jarvisUser.id,
+          amount: amount,
+          action: jarvisAction,
+          adminNotes: jarvisNotes || `Manual ${jarvisAction} of ${amount} JRV tokens by admin`
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        alert(`Successfully ${jarvisAction === 'add' ? 'added' : 'deducted'} ${amount} JRV tokens ${jarvisAction === 'add' ? 'to' : 'from'} ${jarvisUser.full_name || 'user'}!`)
+        closeJarvisModal()
+        await fetchUsers() // Refresh the users list
+      } else {
+        alert(`Failed to ${jarvisAction} tokens: ${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error managing jarvis tokens:', error)
+      alert('Failed to manage tokens. Please try again.')
+    } finally {
+      setIsManagingJarvis(false)
     }
   }
 
@@ -442,7 +617,7 @@ export default function UsersManagement() {
                       </div>
                     </div>
                     
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => openUserModal(userProfile)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center space-x-1"
@@ -459,7 +634,39 @@ export default function UsersManagement() {
                         <span>Add Funds</span>
                       </button>
                       
-                      {!userProfile.is_admin && (
+                      <button
+                        onClick={() => openDeductFundsModal(userProfile)}
+                        className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-lg flex items-center space-x-1"
+                      >
+                        <Minus className="h-4 w-4" />
+                        <span>Deduct Funds</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => openJarvisModal(userProfile, 'add')}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded-lg flex items-center space-x-1"
+                      >
+                        <Coins className="h-4 w-4" />
+                        <span>Add JRV</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => openJarvisModal(userProfile, 'deduct')}
+                        className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg flex items-center space-x-1"
+                      >
+                        <Minus className="h-4 w-4" />
+                        <span>Deduct JRV</span>
+                      </button>
+                      
+                      {userProfile.is_admin ? (
+                        <button
+                          onClick={() => handleUserAction(userProfile.id, 'remove_admin')}
+                          className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg flex items-center space-x-1"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                          <span>Unadmin</span>
+                        </button>
+                      ) : (
                         <>
                           {userProfile.is_banned ? (
                             <button
@@ -518,8 +725,12 @@ export default function UsersManagement() {
                   <p className="text-white font-semibold">{selectedUser.full_name || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">User ID</p>
+                  <p className="text-gray-400 text-sm">Email</p>
                   <p className="text-white">{selectedUser.user_email || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm">User ID</p>
+                  <p className="text-white font-mono text-sm">{selectedUser.id}</p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Referral Code</p>
@@ -669,6 +880,191 @@ export default function UsersManagement() {
                     <>
                       <Plus className="h-5 w-5" />
                       <span>Add Funds</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deduct Funds Modal */}
+      {showDeductFundsModal && deductFundsUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="jarvis-card rounded-2xl p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-white">Deduct Funds</h3>
+              <button
+                onClick={closeDeductFundsModal}
+                className="text-gray-400 hover:text-white"
+                disabled={isDeductingFunds}
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="text-gray-400 text-sm mb-2">User</p>
+                <div className="bg-white/5 rounded-lg p-3">
+                  <p className="text-white font-semibold">{deductFundsUser.full_name || 'N/A'}</p>
+                  <p className="text-gray-400 text-sm">{deductFundsUser.user_email || 'N/A'}</p>
+                  <p className="text-gray-400 text-sm">Current Balance: ${deductFundsUser.main_wallet_balance.toFixed(2)}</p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Amount to Deduct ($)
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={deductFundsUser.main_wallet_balance}
+                    placeholder="0.00"
+                    value={deductFundsAmount}
+                    onChange={(e) => setDeductFundsAmount(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    disabled={isDeductingFunds}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Maximum: ${deductFundsUser.main_wallet_balance.toFixed(2)}</p>
+              </div>
+              
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Admin Notes (Optional)
+                </label>
+                <textarea
+                  placeholder="Reason for deducting funds..."
+                  value={deductFundsNotes}
+                  onChange={(e) => setDeductFundsNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                  disabled={isDeductingFunds}
+                />
+              </div>
+              
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={closeDeductFundsModal}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold"
+                  disabled={isDeductingFunds}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeductFunds}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-3 rounded-lg font-semibold flex items-center justify-center space-x-2"
+                  disabled={isDeductingFunds || !deductFundsAmount}
+                >
+                  {isDeductingFunds ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Deducting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Minus className="h-5 w-5" />
+                      <span>Deduct Funds</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Jarvis Token Management Modal */}
+      {showJarvisModal && jarvisUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="jarvis-card rounded-2xl p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-white">
+                {jarvisAction === 'add' ? 'Add' : 'Deduct'} JRV Tokens
+              </h3>
+              <button
+                onClick={closeJarvisModal}
+                className="text-gray-400 hover:text-white"
+                disabled={isManagingJarvis}
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="text-gray-400 text-sm mb-2">User</p>
+                <div className="bg-white/5 rounded-lg p-3">
+                  <p className="text-white font-semibold">{jarvisUser.full_name || 'N/A'}</p>
+                  <p className="text-gray-400 text-sm">{jarvisUser.user_email || 'N/A'}</p>
+                  <p className="text-gray-400 text-sm">Current JRV Tokens: {(jarvisUser.total_jarvis_tokens || 0).toLocaleString()}</p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Amount to {jarvisAction === 'add' ? 'Add' : 'Deduct'}
+                </label>
+                <div className="relative">
+                  <Coins className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <input
+                    type="number"
+                    min="1"
+                    max={jarvisAction === 'deduct' ? (jarvisUser.total_jarvis_tokens || 0) : undefined}
+                    placeholder="0"
+                    value={jarvisAmount}
+                    onChange={(e) => setJarvisAmount(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-${jarvisAction === 'add' ? 'yellow' : 'amber'}-500`}
+                    disabled={isManagingJarvis}
+                  />
+                </div>
+                {jarvisAction === 'deduct' && (
+                  <p className="text-xs text-gray-500 mt-1">Maximum: {(jarvisUser.total_jarvis_tokens || 0).toLocaleString()}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">
+                  Admin Notes (Optional)
+                </label>
+                <textarea
+                  placeholder={`Reason for ${jarvisAction === 'add' ? 'adding' : 'deducting'} tokens...`}
+                  value={jarvisNotes}
+                  onChange={(e) => setJarvisNotes(e.target.value)}
+                  rows={3}
+                  className={`w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-${jarvisAction === 'add' ? 'yellow' : 'amber'}-500 resize-none`}
+                  disabled={isManagingJarvis}
+                />
+              </div>
+              
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={closeJarvisModal}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold"
+                  disabled={isManagingJarvis}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleJarvisTokens}
+                  className={`flex-1 bg-${jarvisAction === 'add' ? 'yellow' : 'amber'}-600 hover:bg-${jarvisAction === 'add' ? 'yellow' : 'amber'}-700 text-white py-3 rounded-lg font-semibold flex items-center justify-center space-x-2`}
+                  disabled={isManagingJarvis || !jarvisAmount}
+                >
+                  {isManagingJarvis ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>{jarvisAction === 'add' ? 'Adding' : 'Deducting'}...</span>
+                    </>
+                  ) : (
+                    <>
+                      {jarvisAction === 'add' ? <Coins className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
+                      <span>{jarvisAction === 'add' ? 'Add' : 'Deduct'} Tokens</span>
                     </>
                   )}
                 </button>
