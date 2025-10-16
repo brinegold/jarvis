@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
@@ -28,7 +28,7 @@ interface InvestmentPlan {
   maturity_date?: string
   total_earned: number
   user_email: string
-  username: string
+  full_name: string
 }
 
 interface InvestmentStats {
@@ -58,22 +58,10 @@ export default function InvestmentsManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [planFilter, setPlanFilter] = useState<'all' | 'A' | 'B' | 'C'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all')
-  const [isLoading, setIsLoading] = useState(true)
   const supabase = createSupabaseClient()
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/signin')
-    } else if (user) {
-      checkAdminAndFetch()
-    }
-  }, [user, loading, router])
-
-  useEffect(() => {
-    filterInvestments()
-  }, [investments, searchTerm, planFilter, statusFilter])
-
-  const checkAdminAndFetch = async () => {
+  const checkAdminAndFetch = useCallback(async () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -93,34 +81,47 @@ export default function InvestmentsManagement() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [user?.id, supabase, router])
 
-  const fetchInvestments = async () => {
+  const fetchInvestments = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('investment_plans')
         .select(`
           *,
-          profiles!inner(username)
+          profiles!inner(full_name)
         `)
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      const formattedInvestments = data?.map(inv => ({
-        id: inv.id,
-        user_id: inv.user_id,
-        plan_type: inv.plan_type,
-        investment_amount: inv.investment_amount,
-        daily_percentage: inv.daily_percentage,
-        jarvis_tokens_earned: inv.jarvis_tokens_earned || 0,
-        status: inv.status || 'active',
-        created_at: inv.created_at,
-        maturity_date: inv.maturity_date,
-        total_earned: inv.total_earned || 0,
-        user_email: inv.user_id, // Use user_id as fallback since email is in auth.users
-        username: inv.profiles.username
-      })) || []
+      // Fetch profit distributions for all investments
+      const { data: profitData, error: profitError } = await supabase
+        .from('profit_distribution')
+        .select('investment_plan_id, profit_amount')
+
+      if (profitError) throw profitError
+
+      const formattedInvestments = data?.map(inv => {
+        // Calculate total earned from profit_distribution table
+        const investmentProfits = profitData?.filter(profit => profit.investment_plan_id === inv.id) || []
+        const totalEarnedFromProfits = investmentProfits.reduce((sum, profit) => sum + (profit.profit_amount || 0), 0)
+        
+        return {
+          id: inv.id,
+          user_id: inv.user_id,
+          plan_type: inv.plan_type,
+          investment_amount: inv.investment_amount,
+          daily_percentage: inv.daily_percentage,
+          jarvis_tokens_earned: inv.jarvis_tokens_earned || 0,
+          status: inv.status || 'active',
+          created_at: inv.created_at,
+          maturity_date: inv.maturity_date,
+          total_earned: totalEarnedFromProfits,
+          user_email: inv.user_id, // Use user_id as fallback since email is in auth.users
+          full_name: inv.profiles.full_name
+        }
+      }) || []
 
       setInvestments(formattedInvestments)
 
@@ -146,7 +147,19 @@ export default function InvestmentsManagement() {
     } catch (error) {
       console.error('Error fetching investments:', error)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/signin')
+    } else if (user) {
+      checkAdminAndFetch()
+    }
+  }, [user, loading, checkAdminAndFetch])
+
+  useEffect(() => {
+    filterInvestments()
+  }, [investments, searchTerm, planFilter, statusFilter])
 
   const filterInvestments = () => {
     let filtered = investments
@@ -161,7 +174,7 @@ export default function InvestmentsManagement() {
 
     if (searchTerm) {
       filtered = filtered.filter(inv => 
-        (inv.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (inv.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (inv.user_email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
       )
     }
@@ -332,7 +345,7 @@ export default function InvestmentsManagement() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type="text"
-                  placeholder="Search by username or email..."
+                  placeholder="Search by full name or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -382,7 +395,7 @@ export default function InvestmentsManagement() {
                     <div className="flex-1">
                       <div className="flex items-center space-x-4 mb-3">
                         <div>
-                          <p className="text-white font-semibold">{investment.username}</p>
+                          <p className="text-white font-semibold">{investment.full_name || 'N/A'}</p>
                           <p className="text-gray-400 text-sm">{investment.user_email}</p>
                         </div>
                         <div className={`px-3 py-1 rounded-full text-xs font-semibold ${getPlanColor(investment.plan_type)}`}>

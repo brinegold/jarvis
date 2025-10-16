@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
@@ -24,8 +24,8 @@ import Link from 'next/link'
 interface UserProfile {
   id: string
   user_email: string // Changed from email to user_email
-  username: string
-  referral_code: string
+  full_name: string | null
+  referral_code: string | null
   sponsor_id?: string
   main_wallet_balance: number
   fund_wallet_balance: number
@@ -56,19 +56,7 @@ export default function UsersManagement() {
   const [isAddingFunds, setIsAddingFunds] = useState(false)
   const supabase = createSupabaseClient()
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/signin')
-    } else if (user) {
-      checkAdminAndFetch()
-    }
-  }, [user, loading, router])
-
-  useEffect(() => {
-    filterUsers()
-  }, [users, searchTerm, statusFilter])
-
-  const checkAdminAndFetch = async () => {
+  const checkAdminAndFetch = useCallback(async () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -88,9 +76,9 @@ export default function UsersManagement() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [user?.id, supabase, router])
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       // Fetch users with aggregated data
       const { data: usersData, error: usersError } = await supabase
@@ -115,34 +103,73 @@ export default function UsersManagement() {
 
       if (withdrawalError) throw withdrawalError
 
-      // Fetch referral counts
-      const { data: referralData, error: referralError } = await supabase
-        .from('profiles')
-        .select('sponsor_id')
-        .not('sponsor_id', 'is', null)
+      // Create optimized lookup maps for investments and withdrawals
+      const investmentMap = new Map()
+      investmentData?.forEach(inv => {
+        const userId = inv.user_id
+        const currentTotal = investmentMap.get(userId) || 0
+        investmentMap.set(userId, currentTotal + (inv.investment_amount || 0))
+      })
 
-      if (referralError) throw referralError
+      const withdrawalMap = new Map()
+      withdrawalData?.forEach(wd => {
+        const userId = wd.user_id
+        const currentTotal = withdrawalMap.get(userId) || 0
+        withdrawalMap.set(userId, currentTotal + (wd.amount || 0))
+      })
 
-      // Process data
-      const processedUsers = usersData?.map(user => {
-        const userInvestments = investmentData?.filter(inv => inv.user_id === user.id) || []
-        const userWithdrawals = withdrawalData?.filter(wd => wd.user_id === user.id) || []
-        const userReferrals = referralData?.filter(ref => ref.sponsor_id === user.referral_code) || []
+      // Fetch referral counts efficiently using RPC or aggregation
+      const { data: referralCounts, error: referralError } = await supabase
+        .rpc('get_referral_counts')
 
-        return {
-          ...user,
-          user_email: user.id, // Use user_id as fallback since email is in auth.users
-          total_investments: userInvestments.reduce((sum, inv) => sum + (inv.investment_amount || 0), 0),
-          total_withdrawals: userWithdrawals.reduce((sum, wd) => sum + (wd.amount || 0), 0),
-          referral_count: userReferrals.length
-        }
-      }) || []
+      if (referralError) {
+        console.warn('RPC get_referral_counts not available, using fallback method')
+        // Fallback: Create a map of referral counts
+        const { data: referralData, error: fallbackError } = await supabase
+          .from('profiles')
+          .select('sponsor_id')
+          .not('sponsor_id', 'is', null)
+        
+        if (fallbackError) throw fallbackError
+        
+        // Create referral count map
+        const referralCountMap = new Map()
+        referralData?.forEach(ref => {
+          if (ref.sponsor_id) {
+            referralCountMap.set(ref.sponsor_id, (referralCountMap.get(ref.sponsor_id) || 0) + 1)
+          }
+        })
+
+        // Process data with optimized lookups
+        var processedUsers = usersData?.map(user => {
+          return {
+            ...user,
+            user_email: user.id, // Use user_id as fallback since email is in auth.users
+            total_investments: investmentMap.get(user.id) || 0,
+            total_withdrawals: withdrawalMap.get(user.id) || 0,
+            referral_count: referralCountMap.get(user.referral_code) || 0
+          }
+        }) || []
+      } else {
+        // Use RPC result if available
+        const referralCountMap = new Map(referralCounts?.map((rc: { referral_code: string; count: number }) => [rc.referral_code, rc.count]) || [])
+        
+        var processedUsers = usersData?.map(user => {
+          return {
+            ...user,
+            user_email: user.id, // Use user_id as fallback since email is in auth.users
+            total_investments: investmentMap.get(user.id) || 0,
+            total_withdrawals: withdrawalMap.get(user.id) || 0,
+            referral_count: referralCountMap.get(user.referral_code) || 0
+          }
+        }) || []
+      }
 
       setUsers(processedUsers)
     } catch (error) {
       console.error('Error fetching users:', error)
     }
-  }
+  }, [supabase])
 
   const filterUsers = () => {
     let filtered = users
@@ -163,14 +190,26 @@ export default function UsersManagement() {
 
     if (searchTerm) {
       filtered = filtered.filter(u => 
-        u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.referral_code.toLowerCase().includes(searchTerm.toLowerCase())
+        (u.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (u.user_email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (u.referral_code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
       )
     }
 
     setFilteredUsers(filtered)
   }
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/signin')
+    } else if (user) {
+      checkAdminAndFetch()
+    }
+  }, [user, loading, checkAdminAndFetch])
+
+  useEffect(() => {
+    filterUsers()
+  }, [users, searchTerm, statusFilter])
 
   const handleUserAction = async (userId: string, action: 'ban' | 'unban' | 'make_admin' | 'remove_admin') => {
     try {
@@ -254,7 +293,7 @@ export default function UsersManagement() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        alert(`Successfully added $${amount} to ${addFundsUser.username}'s wallet!`)
+        alert(`Successfully added $${amount} to ${addFundsUser.full_name || 'user'}'s wallet!`)
         closeAddFundsModal()
         await fetchUsers() // Refresh the users list
       } else {
@@ -299,7 +338,7 @@ export default function UsersManagement() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type="text"
-                  placeholder="Search by username, email, or referral code..."
+                  placeholder="Search by full name, email, or referral code..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -366,7 +405,7 @@ export default function UsersManagement() {
                       <div className="flex items-center space-x-4 mb-3">
                         <div>
                           <div className="flex items-center space-x-2">
-                            <p className="text-white font-semibold">{userProfile.username}</p>
+                            <p className="text-white font-semibold">{userProfile.full_name || 'N/A'}</p>
                             {userProfile.is_admin && (
                               <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full">Admin</span>
                             )}
@@ -374,8 +413,8 @@ export default function UsersManagement() {
                               <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full">Banned</span>
                             )}
                           </div>
-                          <p className="text-gray-400 text-sm">{userProfile.user_email}</p>
-                          <p className="text-gray-400 text-xs">ID: {userProfile.referral_code}</p>
+                          <p className="text-gray-400 text-sm">{userProfile.user_email || 'N/A'}</p>
+                          <p className="text-gray-400 text-xs">ID: {userProfile.referral_code || 'N/A'}</p>
                         </div>
                       </div>
                       
@@ -475,16 +514,16 @@ export default function UsersManagement() {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-gray-400 text-sm">Username</p>
-                  <p className="text-white font-semibold">{selectedUser.username}</p>
+                  <p className="text-gray-400 text-sm">Full Name</p>
+                  <p className="text-white font-semibold">{selectedUser.full_name || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Email</p>
-                  <p className="text-white">{selectedUser.user_email}</p>
+                  <p className="text-gray-400 text-sm">User ID</p>
+                  <p className="text-white">{selectedUser.user_email || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Referral Code</p>
-                  <p className="text-white font-mono">{selectedUser.referral_code}</p>
+                  <p className="text-white font-mono">{selectedUser.referral_code || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Sponsor ID</p>
@@ -569,8 +608,8 @@ export default function UsersManagement() {
               <div>
                 <p className="text-gray-400 text-sm mb-2">User</p>
                 <div className="bg-white/5 rounded-lg p-3">
-                  <p className="text-white font-semibold">{addFundsUser.username}</p>
-                  <p className="text-gray-400 text-sm">{addFundsUser.user_email}</p>
+                  <p className="text-white font-semibold">{addFundsUser.full_name || 'N/A'}</p>
+                  <p className="text-gray-400 text-sm">{addFundsUser.user_email || 'N/A'}</p>
                   <p className="text-gray-400 text-sm">Current Balance: ${addFundsUser.main_wallet_balance.toFixed(2)}</p>
                 </div>
               </div>
