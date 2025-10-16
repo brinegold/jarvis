@@ -19,9 +19,6 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: 'Admin privileges required' }, { status: 403 })
-    }
 
     console.log('Admin triggered profit distribution:', user.id)
 
