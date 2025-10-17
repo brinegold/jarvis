@@ -60,41 +60,88 @@ async function distributeInvestmentProfits() {
         continue
       }
 
-      // Check if profit already distributed in the last 24 hours
-      // This ensures distribution happens every 24 hours, not just once per day
-      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      // Check if profit already distributed for today
+      // This ensures we don't distribute multiple times per day
+      const today = new Date().toISOString().split('T')[0]
 
       const { data: existingDistribution } = await supabaseAdmin
         .from('profit_distributions')
         .select('id')
         .eq('plan_id', plan.id)
-        .gte('distribution_date', twentyFourHoursAgo.toISOString().split('T')[0])
+        .eq('distribution_date', today)
 
       if (existingDistribution && existingDistribution.length > 0) {
-        console.log(`Profit already distributed in last 24 hours for plan ${plan.id}`)
+        console.log(`Profit already distributed today for plan ${plan.id}`)
         continue
       }
 
-      // Calculate daily profit (full daily amount)
-      const dailyProfitRate = plan.daily_percentage / 100
-      const profitAmount = plan.investment_amount * dailyProfitRate
+      // Check if we need to catch up on missed days
+      const daysSinceCreation = Math.floor((now.getTime() - planCreatedAt.getTime()) / (1000 * 60 * 60 * 24))
+      
+      // Get the last distribution date for this plan
+      const { data: lastDistribution } = await supabaseAdmin
+        .from('profit_distributions')
+        .select('distribution_date')
+        .eq('plan_id', plan.id)
+        .order('distribution_date', { ascending: false })
+        .limit(1)
 
-      // Add to profit distributions
-      profitDistributions.push({
-        plan_id: plan.id,
-        user_id: plan.user_id,
-        profit_amount: profitAmount,
-        distribution_date: now.toISOString().split('T')[0]
-      })
-
-      // Accumulate user updates
-      if (userUpdates.has(plan.user_id)) {
-        userUpdates.set(plan.user_id, userUpdates.get(plan.user_id) + profitAmount)
+      let startDate = planCreatedAt
+      if (lastDistribution && lastDistribution.length > 0) {
+        const lastDistDate = new Date(lastDistribution[0].distribution_date)
+        startDate = new Date(lastDistDate.getTime() + 24 * 60 * 60 * 1000) // Day after last distribution
       } else {
-        userUpdates.set(plan.user_id, profitAmount)
+        // First distribution should be 24 hours after creation
+        startDate = new Date(planCreatedAt.getTime() + 24 * 60 * 60 * 1000)
       }
 
-      console.log(`Calculated daily profit for plan ${plan.id}: $${profitAmount.toFixed(8)} (24h cycle)`)
+      // Calculate how many days we need to catch up
+      const daysToDistribute = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      if (daysToDistribute <= 0) {
+        console.log(`Plan ${plan.id} is up to date, no distributions needed`)
+        continue
+      }
+
+      console.log(`Plan ${plan.id} needs ${daysToDistribute} day(s) of profit distribution`)
+
+      // Distribute profits for each missing day
+      for (let dayOffset = 0; dayOffset < daysToDistribute; dayOffset++) {
+        const distributionDate = new Date(startDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+        const distributionDateStr = distributionDate.toISOString().split('T')[0]
+
+        // Skip if this date already has a distribution
+        const { data: existingForDate } = await supabaseAdmin
+          .from('profit_distributions')
+          .select('id')
+          .eq('plan_id', plan.id)
+          .eq('distribution_date', distributionDateStr)
+
+        if (existingForDate && existingForDate.length > 0) {
+          continue
+        }
+
+        // Calculate daily profit
+        const dailyProfitRate = plan.daily_percentage / 100
+        const profitAmount = plan.investment_amount * dailyProfitRate
+
+        // Add to profit distributions
+        profitDistributions.push({
+          plan_id: plan.id,
+          user_id: plan.user_id,
+          profit_amount: profitAmount,
+          distribution_date: distributionDateStr
+        })
+
+        // Accumulate user updates
+        if (userUpdates.has(plan.user_id)) {
+          userUpdates.set(plan.user_id, userUpdates.get(plan.user_id) + profitAmount)
+        } else {
+          userUpdates.set(plan.user_id, profitAmount)
+        }
+
+        console.log(`Queued profit distribution for plan ${plan.id} on ${distributionDateStr}: $${profitAmount.toFixed(8)}`)
+      }
     }
 
     if (profitDistributions.length === 0) {
@@ -242,41 +289,82 @@ async function distributeJrcStakingProfits() {
         continue
       }
 
-      // Check if profit already distributed in the last 24 hours
-      // This ensures distribution happens every 24 hours, not just once per day
-      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      // Check if profit already distributed for today
+      const today = new Date().toISOString().split('T')[0]
 
       const { data: existingDistribution } = await supabaseAdmin
         .from('jrc_staking_distributions')
         .select('id')
         .eq('staking_plan_id', plan.id)
-        .gte('distribution_date', twentyFourHoursAgo.toISOString().split('T')[0])
+        .eq('distribution_date', today)
 
       if (existingDistribution && existingDistribution.length > 0) {
-        console.log(`JRC staking profit already distributed in last 24 hours for plan ${plan.id}`)
+        console.log(`JRC staking profit already distributed today for plan ${plan.id}`)
         continue
       }
 
-      // Calculate daily profit for JRC staking (in JRC coins)
-      const dailyProfitRate = plan.daily_percentage / 100
-      const profitAmount = plan.amount * dailyProfitRate
+      // Check if we need to catch up on missed days for JRC staking
+      const { data: lastJrcDistribution } = await supabaseAdmin
+        .from('jrc_staking_distributions')
+        .select('distribution_date')
+        .eq('staking_plan_id', plan.id)
+        .order('distribution_date', { ascending: false })
+        .limit(1)
 
-      // Add to staking distributions
-      stakingDistributions.push({
-        staking_plan_id: plan.id,
-        user_id: plan.user_id,
-        profit_amount: profitAmount,
-        distribution_date: now.toISOString().split('T')[0]
-      })
-
-      // Accumulate user updates (JRC coins)
-      if (stakingUserUpdates.has(plan.user_id)) {
-        stakingUserUpdates.set(plan.user_id, stakingUserUpdates.get(plan.user_id) + profitAmount)
+      let jrcStartDate = planCreatedAt
+      if (lastJrcDistribution && lastJrcDistribution.length > 0) {
+        const lastDistDate = new Date(lastJrcDistribution[0].distribution_date)
+        jrcStartDate = new Date(lastDistDate.getTime() + 24 * 60 * 60 * 1000)
       } else {
-        stakingUserUpdates.set(plan.user_id, profitAmount)
+        jrcStartDate = new Date(planCreatedAt.getTime() + 24 * 60 * 60 * 1000)
       }
 
-      console.log(`Calculated JRC staking profit for plan ${plan.id}: ${profitAmount.toFixed(2)} JRC (24h cycle)`)
+      const jrcDaysToDistribute = Math.floor((now.getTime() - jrcStartDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      if (jrcDaysToDistribute <= 0) {
+        console.log(`JRC staking plan ${plan.id} is up to date`)
+        continue
+      }
+
+      console.log(`JRC staking plan ${plan.id} needs ${jrcDaysToDistribute} day(s) of profit distribution`)
+
+      // Distribute JRC profits for each missing day
+      for (let dayOffset = 0; dayOffset < jrcDaysToDistribute; dayOffset++) {
+        const distributionDate = new Date(jrcStartDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+        const distributionDateStr = distributionDate.toISOString().split('T')[0]
+
+        // Skip if this date already has a distribution
+        const { data: existingForDate } = await supabaseAdmin
+          .from('jrc_staking_distributions')
+          .select('id')
+          .eq('staking_plan_id', plan.id)
+          .eq('distribution_date', distributionDateStr)
+
+        if (existingForDate && existingForDate.length > 0) {
+          continue
+        }
+
+        // Calculate daily profit for JRC staking (in JRC coins)
+        const dailyProfitRate = plan.daily_percentage / 100
+        const profitAmount = plan.amount * dailyProfitRate
+
+        // Add to staking distributions
+        stakingDistributions.push({
+          staking_plan_id: plan.id,
+          user_id: plan.user_id,
+          profit_amount: profitAmount,
+          distribution_date: distributionDateStr
+        })
+
+        // Accumulate user updates (JRC coins)
+        if (stakingUserUpdates.has(plan.user_id)) {
+          stakingUserUpdates.set(plan.user_id, stakingUserUpdates.get(plan.user_id) + profitAmount)
+        } else {
+          stakingUserUpdates.set(plan.user_id, profitAmount)
+        }
+
+        console.log(`Queued JRC staking profit for plan ${plan.id} on ${distributionDateStr}: ${profitAmount.toFixed(2)} JRC`)
+      }
     }
 
     if (stakingDistributions.length === 0) {

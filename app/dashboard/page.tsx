@@ -76,6 +76,7 @@ export default function DashboardPage() {
   const [plans, setPlans] = useState<InvestmentPlan[]>([])
   const [jrcStakingPlans, setJrcStakingPlans] = useState<JrcStakingPlan[]>([])
   const [totalJrcEarned, setTotalJrcEarned] = useState(0)
+  const [stakingIncome, setStakingIncome] = useState(0)
   const [loadingData, setLoadingData] = useState(true)
   const [showSkeleton, setShowSkeleton] = useState(false) // Always false - no skeleton
   const [showJrcModal, setShowJrcModal] = useState(false)
@@ -122,6 +123,9 @@ export default function DashboardPage() {
       // Calculate total profits
       const calculatedProfits = (plansData || []).reduce((sum: number, plan: any) => sum + (plan.total_profit_earned || 0), 0)
       setTotalProfits(calculatedProfits)
+      
+      // Set staking income (same as total profits for now)
+      setStakingIncome(calculatedProfits)
 
       // Fetch JRC staking plans
       const { data: jrcStakingData, error: jrcStakingError } = await supabase
@@ -180,26 +184,36 @@ export default function DashboardPage() {
       }
 
       // Fetch team investment data (sum of all referrals' investments)
-      try {
-        const { data: directReferrals } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('sponsor_id', profile?.referral_code)
-        
-        if (directReferrals && directReferrals.length > 0) {
-          const referralIds = directReferrals.map(r => r.id)
+      // Move this after profile is set
+      if (profileData?.referral_code) {
+        try {
+          const { data: directReferrals } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('sponsor_id', profileData.referral_code)
           
-          // Get total investments from all direct referrals
-          const { data: teamInvestments } = await supabase
-            .from('investment_plans')
-            .select('investment_amount')
-            .in('user_id', referralIds)
-          
-          const totalTeamInvestment = teamInvestments?.reduce((sum, inv) => sum + inv.investment_amount, 0) || 0
-          setTeamInvestment(totalTeamInvestment)
+          if (directReferrals && directReferrals.length > 0) {
+            const referralIds = directReferrals.map(r => r.id)
+            
+            // Get total investments from all direct referrals
+            const { data: teamInvestments } = await supabase
+              .from('investment_plans')
+              .select('investment_amount')
+              .in('user_id', referralIds)
+            
+            const totalTeamInvestment = teamInvestments?.reduce((sum, inv) => sum + inv.investment_amount, 0) || 0
+            setTeamInvestment(totalTeamInvestment)
+            
+            console.log('📊 Team Investment calculation:', {
+              referralCode: profileData.referral_code,
+              directReferrals: directReferrals.length,
+              teamInvestments: teamInvestments?.length || 0,
+              totalTeamInvestment
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching team investment data:', error)
         }
-      } catch (error) {
-        console.error('Error fetching team investment data:', error)
       }
 
       // Calculate total JRC staked (will be updated after JRC staking data is fetched)
@@ -262,15 +276,29 @@ export default function DashboardPage() {
           }
           break
 
+        case 'staking':
+          // Fetch USDT investment plans (staking income)
+          const { data: stakingIncome, error: stakingError } = await supabase
+            .from('investment_plans')
+            .select('*')
+            .eq('user_id', user?.id)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false })
+          
+          if (!stakingError) {
+            setIncomeData(stakingIncome || [])
+          }
+          break
+
         case 'staking-referral':
           // Fetch JRC staking plans and distributions
-          const { data: stakingPlans, error: stakingError } = await supabase
+          const { data: stakingPlans, error: jrcStakingError } = await supabase
             .from('jrc_staking_plans')
             .select('*')
             .eq('user_id', user?.id)
             .order('created_at', { ascending: false })
           
-          if (!stakingError) {
+          if (!jrcStakingError) {
             setIncomeData(stakingPlans || [])
           }
           break
@@ -598,7 +626,7 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-            <p className="text-white font-bold text-sm sm:text-base">$0</p>
+            <p className="text-white font-bold text-sm sm:text-base">${stakingIncome.toFixed(2)}</p>
           </div>
 
           <div className="jarvis-card rounded-xl p-3 sm:p-4 flex items-center justify-between">

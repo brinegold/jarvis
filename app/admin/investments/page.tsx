@@ -29,6 +29,7 @@ interface InvestmentPlan {
   total_earned: number
   user_email: string
   full_name: string
+  is_expected_profit?: boolean
 }
 
 interface InvestmentStats {
@@ -94,18 +95,59 @@ export default function InvestmentsManagement() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
+      
+      console.log('Investment plans data:', data)
 
       // Fetch profit distributions for all investments
       const { data: profitData, error: profitError } = await supabase
-        .from('profit_distribution')
-        .select('investment_plan_id, profit_amount')
+        .from('profit_distributions')
+        .select('plan_id, profit_amount')
 
       if (profitError) throw profitError
+      
+      console.log('Profit distributions data:', profitData)
+
+      // Fetch user emails
+      const userIds = data?.map(inv => inv.user_id) || []
+      let emailMap: { [key: string]: string } = {}
+      
+      if (userIds.length > 0) {
+        try {
+          const emailResponse = await fetch('/api/admin/get-user-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userIds })
+          })
+          const emailData = await emailResponse.json()
+          if (emailData.success) {
+            emailMap = emailData.users.reduce((acc: any, user: any) => {
+              acc[user.id] = user.email
+              return acc
+            }, {})
+          }
+        } catch (error) {
+          console.error('Error fetching emails:', error)
+        }
+      }
 
       const formattedInvestments = data?.map(inv => {
-        // Calculate total earned from profit_distribution table
-        const investmentProfits = profitData?.filter(profit => profit.investment_plan_id === inv.id) || []
+        // Calculate total earned from profit_distributions table
+        const investmentProfits = profitData?.filter(profit => profit.plan_id === inv.id) || []
         const totalEarnedFromProfits = investmentProfits.reduce((sum, profit) => sum + (profit.profit_amount || 0), 0)
+        
+        // Calculate expected profits based on time elapsed (for display purposes)
+        const createdAt = new Date(inv.created_at)
+        const now = new Date()
+        const daysSinceCreation = Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)))
+        const dailyProfitRate = inv.daily_percentage / 100
+        const expectedTotalProfit = daysSinceCreation * inv.investment_amount * dailyProfitRate
+        
+        // Use the maximum of: distributed profits, stored total, or expected profit
+        const actualProfit = Math.max(totalEarnedFromProfits, inv.total_profit_earned || 0)
+        const displayProfit = Math.max(actualProfit, expectedTotalProfit)
+        const isExpectedProfit = displayProfit > actualProfit
+        
+        console.log(`Investment ${inv.id}: days since creation: ${daysSinceCreation}, expected: $${expectedTotalProfit.toFixed(2)}, actual: $${actualProfit.toFixed(2)}, display: $${displayProfit.toFixed(2)}, isExpected: ${isExpectedProfit}`)
         
         return {
           id: inv.id,
@@ -114,13 +156,14 @@ export default function InvestmentsManagement() {
           investment_amount: inv.investment_amount,
           daily_percentage: inv.daily_percentage,
           jarvis_tokens_earned: inv.jarvis_tokens_earned || 0,
-          status: inv.status || 'active',
+          status: inv.is_active ? 'active' : 'completed',
           created_at: inv.created_at,
           maturity_date: inv.maturity_date,
-          total_earned: totalEarnedFromProfits,
-          user_email: inv.user_id, // Use user_id as fallback since email is in auth.users
-          full_name: inv.profiles.full_name
-        }
+          total_earned: displayProfit,
+          user_email: emailMap[inv.user_id] || inv.user_id,
+          full_name: inv.profiles.full_name,
+          is_expected_profit: isExpectedProfit
+        } as InvestmentPlan
       }) || []
 
       setInvestments(formattedInvestments)
@@ -421,7 +464,14 @@ export default function InvestmentsManagement() {
                         </div>
                         <div>
                           <p className="text-gray-400">Total Earned</p>
-                          <p className="text-blue-400">${investment.total_earned.toFixed(2)}</p>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-blue-400">${investment.total_earned.toFixed(2)}</p>
+                            {investment.is_expected_profit && (
+                              <span className="text-xs text-yellow-400 bg-yellow-400/20 px-2 py-1 rounded" title="Expected profit based on time elapsed">
+                                Est.
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <p className="text-gray-400">Started</p>
