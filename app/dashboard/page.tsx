@@ -101,102 +101,126 @@ export default function DashboardPage() {
 
   const fetchUserData = async () => {
     try {
-      // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.id)
-        .single()
-
-      if (profileError) throw profileError
-      setProfile(profileData)
-
-      // Fetch investment plans
-      const { data: plansData, error: plansError } = await supabase
-        .from('investment_plans')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('is_active', true)
-
-      if (plansError) throw plansError
-      setPlans(plansData || [])
-
-      // Calculate total profits
-      const calculatedProfits = (plansData || []).reduce((sum: number, plan: any) => sum + (plan.total_profit_earned || 0), 0)
-      setTotalProfits(calculatedProfits)
-      
-      // Set staking income (same as total profits for now)
-      setStakingIncome(calculatedProfits)
-
-      // Fetch JRC staking plans
-      const { data: jrcStakingData, error: jrcStakingError } = await supabase
-        .from('jrc_staking_plans')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-
-      if (jrcStakingError) {
-        console.error('Error fetching JRC staking plans:', jrcStakingError)
-      } else {
-        setJrcStakingPlans(jrcStakingData || [])
+      // Execute all queries in parallel for instant loading
+      const [
+        profileResult,
+        plansResult,
+        jrcStakingResult,
+        legacyCommissionsResult
+      ] = await Promise.allSettled([
+        // Profile query
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user?.id)
+          .single(),
         
-        // Calculate total JRC earned from all staking plans
-        const totalJrcEarned = (jrcStakingData || []).reduce((sum: number, plan: JrcStakingPlan) => 
+        // Investment plans query
+        supabase
+          .from('investment_plans')
+          .select('*')
+          .eq('user_id', user?.id)
+          .eq('is_active', true),
+        
+        // JRC staking plans query
+        supabase
+          .from('jrc_staking_plans')
+          .select('*')
+          .eq('user_id', user?.id)
+          .order('created_at', { ascending: false }),
+        
+        // Legacy referral commissions query (fallback)
+        supabase
+          .from('referral_commissions')
+          .select('commission_amount')
+          .eq('referrer_id', user?.id)
+      ])
+
+      // Process profile data
+      let profileData = null
+      if (profileResult.status === 'fulfilled' && !profileResult.value.error) {
+        profileData = profileResult.value.data
+        setProfile(profileData)
+      }
+
+      // Process investment plans data
+      let plansData: any[] = []
+      if (plansResult.status === 'fulfilled' && !plansResult.value.error) {
+        plansData = plansResult.value.data || []
+        setPlans(plansData)
+        
+        // Calculate total profits and staking income
+        const calculatedProfits = plansData.reduce((sum: number, plan: any) => sum + (plan.total_profit_earned || 0), 0)
+        setTotalProfits(calculatedProfits)
+        setStakingIncome(calculatedProfits)
+      }
+
+      // Process JRC staking data
+      if (jrcStakingResult.status === 'fulfilled' && !jrcStakingResult.value.error) {
+        const jrcStakingData = jrcStakingResult.value.data || []
+        setJrcStakingPlans(jrcStakingData)
+        
+        // Calculate total JRC earned and staked
+        const totalJrcEarned = jrcStakingData.reduce((sum: number, plan: JrcStakingPlan) => 
           sum + (plan.total_profit_earned || 0), 0)
         setTotalJrcEarned(totalJrcEarned)
         
-        // Calculate total JRC staked (only active plans)
-        const totalStaked = (jrcStakingData || [])
-          .filter(plan => plan.status === 'active')
+        const totalStaked = jrcStakingData
+          .filter((plan: JrcStakingPlan) => plan.status === 'active')
           .reduce((sum: number, plan: JrcStakingPlan) => sum + (plan.amount || 0), 0)
         setTotalJrcStaked(totalStaked)
-        
-        console.log('📊 JRC Staking calculation:', {
-          jrcStakingPlans: jrcStakingData?.length || 0,
-          totalStaked,
-          planAmounts: jrcStakingData?.map(p => p.amount) || []
-        })
       }
 
-      // Fetch dual referral stats
-      try {
-        const dualStats = await dualReferralService.getReferralStats(user?.id || '')
-        setReferralUsdtEarned(dualStats.totalUsdtEarned)
-        setReferralJrcEarned(dualStats.totalJrcEarned)
-        setTotalReferrals(dualStats.totalReferrals)
-        
-        // Use only the dual stats total USDT earned to avoid double counting
-        setReferralCommissions(dualStats.totalUsdtEarned)
-      } catch (error) {
-        console.error('Error fetching referral stats:', error)
-        
-        // Fallback to legacy commissions if dual stats fail
-        try {
-          const { data: legacyCommissions } = await supabase
-            .from('referral_commissions')
-            .select('commission_amount')
-            .eq('referrer_id', user?.id)
-          
-          const legacyTotal = legacyCommissions?.reduce((sum, c) => sum + parseFloat(c.commission_amount?.toString() || '0'), 0) || 0
-          setReferralCommissions(legacyTotal)
-        } catch (legacyError) {
-          console.error('Error fetching legacy referral stats:', legacyError)
-        }
-      }
-
-      // Fetch team investment data (sum of all referrals' investments)
-      // Move this after profile is set
+      // Process referral data in parallel after profile is available
       if (profileData?.referral_code) {
-        try {
-          const { data: directReferrals } = await supabase
+        const [
+          referralStatsResult,
+          directReferralsResult
+        ] = await Promise.allSettled([
+          // Optimized referral stats (simplified)
+          supabase
+            .from('referral_commissions')
+            .select('commission_amount, jrc_commission, level')
+            .eq('referrer_id', user?.id),
+          
+          // Direct referrals for team investment
+          supabase
             .from('profiles')
             .select('id')
             .eq('sponsor_id', profileData.referral_code)
+        ])
+
+        // Process referral stats
+        if (referralStatsResult.status === 'fulfilled' && !referralStatsResult.value.error) {
+          const commissions = referralStatsResult.value.data || []
+          const totalUsdtEarned = commissions.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
+          const totalJrcEarned = commissions.reduce((sum, c) => sum + (c.jrc_commission || 0), 0)
           
-          if (directReferrals && directReferrals.length > 0) {
+          setReferralCommissions(totalUsdtEarned)
+          setReferralUsdtEarned(totalUsdtEarned)
+          setReferralJrcEarned(totalJrcEarned)
+          
+          // Count unique referrals from commissions
+          const uniqueReferrals = new Set(commissions.map(c => c.referred_id)).size
+          setTotalReferrals(uniqueReferrals)
+        } else {
+          // Fallback to legacy commissions
+          if (legacyCommissionsResult.status === 'fulfilled' && !legacyCommissionsResult.value.error) {
+            const legacyCommissions = legacyCommissionsResult.value.data || []
+            const legacyTotal = legacyCommissions.reduce((sum, c) => sum + parseFloat(c.commission_amount?.toString() || '0'), 0)
+            setReferralCommissions(legacyTotal)
+          }
+        }
+
+        // Process team investment
+        if (directReferralsResult.status === 'fulfilled' && !directReferralsResult.value.error) {
+          const directReferrals = directReferralsResult.value.data || []
+          setTotalReferrals(directReferrals.length) // Set actual direct referrals count
+          
+          if (directReferrals.length > 0) {
             const referralIds = directReferrals.map(r => r.id)
             
-            // Get total investments from all direct referrals
+            // Get team investments in parallel
             const { data: teamInvestments } = await supabase
               .from('investment_plans')
               .select('investment_amount')
@@ -204,27 +228,14 @@ export default function DashboardPage() {
             
             const totalTeamInvestment = teamInvestments?.reduce((sum, inv) => sum + inv.investment_amount, 0) || 0
             setTeamInvestment(totalTeamInvestment)
-            
-            console.log('📊 Team Investment calculation:', {
-              referralCode: profileData.referral_code,
-              directReferrals: directReferrals.length,
-              teamInvestments: teamInvestments?.length || 0,
-              totalTeamInvestment
-            })
           }
-        } catch (error) {
-          console.error('Error fetching team investment data:', error)
         }
       }
-
-      // Calculate total JRC staked (will be updated after JRC staking data is fetched)
-      // This is moved to after the JRC staking data fetch
 
     } catch (error) {
       console.error('Error fetching user data:', error)
     } finally {
       setLoadingData(false)
-      // No skeleton delay - dashboard renders immediately
     }
   }
 
@@ -377,9 +388,23 @@ export default function DashboardPage() {
     }
   }
 
-  // No loading state - dashboard renders immediately
-  if (!user || !profile) {
+  // Render dashboard immediately without loading states
+  if (!user) {
     return null
+  }
+  
+  // Show dashboard with default values while data loads
+  if (!profile) {
+    return (
+      <div className="min-h-screen jarvis-gradient">
+        <div className="container mx-auto p-3 sm:p-4 flex items-center justify-center">
+          <div className="text-white text-center">
+            <h2 className="text-xl font-semibold mb-2">Loading Dashboard...</h2>
+            <p className="text-gray-300">Please wait a moment</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const totalInvestment = plans.reduce((sum, plan) => sum + plan.investment_amount, 0)
@@ -532,6 +557,7 @@ export default function DashboardPage() {
               <div>
                 <h3 className="text-white font-semibold text-sm sm:text-base">Jarvis Coins</h3>
                 <p className="text-lg sm:text-2xl font-bold text-yellow-400">{profile.total_jarvis_tokens.toLocaleString()} JRC</p>
+                <p className="text-gray-300 text-xs sm:text-sm mb-2">$0.1 per JRC</p>
                 <button 
                   onClick={() => setShowJrcModal(true)}
                   className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 sm:px-4 rounded-full text-xs sm:text-sm font-semibold mt-2 transition-colors"
