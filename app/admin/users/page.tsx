@@ -73,6 +73,10 @@ export default function UsersManagement() {
   const [jarvisAction, setJarvisAction] = useState<'add' | 'deduct'>('add')
   const [isManagingJarvis, setIsManagingJarvis] = useState(false)
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [usersPerPage] = useState(50)
+  
   const supabase = createSupabaseClient()
 
   const checkAdminAndFetch = useCallback(async () => {
@@ -216,44 +220,38 @@ export default function UsersManagement() {
     }
   }, [supabase])
 
-  const filterUsers = () => {
+  // Filter users based on search and status
+  useEffect(() => {
     let filtered = users
 
-    if (statusFilter !== 'all') {
-      switch (statusFilter) {
-        case 'active':
-          filtered = filtered.filter(u => !u.is_banned && !u.is_admin)
-          break
-        case 'banned':
-          filtered = filtered.filter(u => u.is_banned)
-          break
-        case 'admin':
-          filtered = filtered.filter(u => u.is_admin)
-          break
-      }
-    }
-
+    // Apply search filter
     if (searchTerm) {
-      filtered = filtered.filter(u => 
-        (u.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (u.user_email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (u.referral_code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(user => 
+        user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.referral_code?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
-    setFilteredUsers(filtered)
-  }
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/signin')
-    } else if (user) {
-      checkAdminAndFetch()
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(user => {
+        switch (statusFilter) {
+          case 'active':
+            return !user.is_banned && !user.is_admin
+          case 'banned':
+            return user.is_banned
+          case 'admin':
+            return user.is_admin
+          default:
+            return true
+        }
+      })
     }
-  }, [user, loading, checkAdminAndFetch])
 
-  useEffect(() => {
-    filterUsers()
+    setFilteredUsers(filtered)
+    // Reset to first page when filters change
+    setCurrentPage(1)
   }, [users, searchTerm, statusFilter])
 
   const handleUserAction = async (userId: string, action: 'ban' | 'unban' | 'make_admin' | 'remove_admin') => {
@@ -564,7 +562,14 @@ export default function UsersManagement() {
 
         {/* Users Table */}
         <div className="jarvis-card rounded-2xl p-6">
-          <h2 className="text-xl font-bold text-white mb-6">Users</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">Users</h2>
+            {filteredUsers.length > 0 && (
+              <div className="text-gray-300 text-sm">
+                Showing {((currentPage - 1) * usersPerPage) + 1}-{Math.min(currentPage * usersPerPage, filteredUsers.length)} of {filteredUsers.length} users
+              </div>
+            )}
+          </div>
           
           {filteredUsers.length === 0 ? (
             <div className="text-center py-8">
@@ -572,8 +577,11 @@ export default function UsersManagement() {
               <p className="text-gray-300">No users found</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredUsers.map((userProfile) => (
+            <>
+              <div className="space-y-4">
+                {filteredUsers
+                  .slice((currentPage - 1) * usersPerPage, currentPage * usersPerPage)
+                  .map((userProfile) => (
                 <div key={userProfile.id} className="bg-white/5 rounded-lg p-4 border border-white/10">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex-1">
@@ -698,8 +706,69 @@ export default function UsersManagement() {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              
+              {/* Pagination Controls */}
+              {filteredUsers.length > usersPerPage && (
+                <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/10">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => i + 1)
+                        .filter(page => {
+                          const totalPages = Math.ceil(filteredUsers.length / usersPerPage)
+                          if (totalPages <= 7) return true
+                          if (page === 1 || page === totalPages) return true
+                          if (page >= currentPage - 2 && page <= currentPage + 2) return true
+                          return false
+                        })
+                        .map((page, index, array) => {
+                          const prevPage = array[index - 1]
+                          const showEllipsis = prevPage && page - prevPage > 1
+                          
+                          return (
+                            <div key={page} className="flex items-center">
+                              {showEllipsis && (
+                                <span className="px-2 py-2 text-gray-400">...</span>
+                              )}
+                              <button
+                                onClick={() => setCurrentPage(page)}
+                                className={`px-3 py-2 rounded-lg transition-colors ${
+                                  currentPage === page
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white/10 text-white hover:bg-white/20'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            </div>
+                          )
+                        })}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredUsers.length / usersPerPage)))}
+                      disabled={currentPage === Math.ceil(filteredUsers.length / usersPerPage)}
+                      className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  
+                  <div className="text-gray-300 text-sm">
+                    Page {currentPage} of {Math.ceil(filteredUsers.length / usersPerPage)}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

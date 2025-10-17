@@ -180,7 +180,7 @@ export default function DashboardPage() {
           // Optimized referral stats (simplified)
           supabase
             .from('referral_commissions')
-            .select('commission_amount, jrc_commission, level')
+            .select('commission_amount, jrc_commission, level, referred_id')
             .eq('referrer_id', user?.id),
           
           // Direct referrals for team investment
