@@ -14,6 +14,7 @@ import {
   Coins,
   Youtube,
   Mail,
+  BookOpen,
   Send as Telegram
 } from 'lucide-react'
 import Link from 'next/link'
@@ -573,6 +574,11 @@ export default function DashboardPage() {
             <Users className="h-6 w-6 sm:h-8 sm:w-8 text-pink-400 mx-auto mb-2" />
             <p className="text-white font-semibold text-xs sm:text-sm">Refer Link</p>
           </Link>
+
+          <a href="/Guide.pdf" target="_blank" rel="noopener noreferrer" className="jarvis-card rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center hover:scale-105 transition-transform">
+            <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-cyan-400 mx-auto mb-2" />
+            <p className="text-white font-semibold text-xs sm:text-sm">User Guide</p>
+          </a>
         </div>
 
         {/* Income Tracking */}
