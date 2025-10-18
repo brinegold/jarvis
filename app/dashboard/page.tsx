@@ -149,9 +149,11 @@ export default function DashboardPage() {
         plansData = plansResult.value.data || []
         setPlans(plansData)
         
-        // Calculate total profits and staking income
+        // Calculate total profits from investment plans
         const calculatedProfits = plansData.reduce((sum: number, plan: any) => sum + (plan.total_profit_earned || 0), 0)
         setTotalProfits(calculatedProfits)
+        
+        // Set staking income to investment profits (this is what "Staking Income" refers to)
         setStakingIncome(calculatedProfits)
       }
 
