@@ -5,18 +5,16 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createSupabaseClient } from '@/lib/supabase'
-import { Bot, Eye, EyeOff, User } from 'lucide-react'
+import { Eye, EyeOff, User } from 'lucide-react'
 
 export default function SignInPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    captcha: '',
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [captchaCode] = useState(() => Math.floor(100000 + Math.random() * 900000).toString())
   const router = useRouter()
   const supabase = createSupabaseClient()
 
@@ -24,12 +22,6 @@ export default function SignInPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-
-    if (formData.captcha !== captchaCode) {
-      setError('Invalid captcha code')
-      setLoading(false)
-      return
-    }
 
     try {
       const { data, error } = await (supabase.auth as any).signInWithPassword({
@@ -131,26 +123,6 @@ export default function SignInPage() {
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-white text-sm font-medium mb-2">
-                Captcha
-              </label>
-              <div className="flex items-center space-x-4">
-                <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-mono text-lg tracking-wider">
-                  {captchaCode}
-                </div>
-                <input
-                  type="text"
-                  name="captcha"
-                  value={formData.captcha}
-                  onChange={handleChange}
-                  required
-                  className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter captcha"
-                />
               </div>
             </div>
 
