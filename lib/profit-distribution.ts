@@ -45,25 +45,29 @@ async function distributeInvestmentProfits() {
     }
 
     const now = new Date()
-    const today = new Date().toISOString().split('T')[0]
+    const today = now.toISOString().split('T')[0]
     const profitDistributions = []
     const userUpdates = new Map()
 
     for (const plan of plans) {
-      // Check if 24 hours have passed since plan creation
       const planCreatedAt = new Date(plan.created_at)
-      const hoursSinceCreation = (now.getTime() - planCreatedAt.getTime()) / (1000 * 60 * 60)
-
-      // Only distribute if exactly 24 hours or more have passed since creation
-      if (hoursSinceCreation < 24) {
-        console.log(`Plan ${plan.id} created ${hoursSinceCreation.toFixed(2)} hours ago, needs to wait 24 hours`)
+      
+      // Calculate the next distribution date (24 hours after creation, then daily)
+      const creationDate = new Date(planCreatedAt.getTime())
+      creationDate.setUTCHours(0, 0, 0, 0) // Normalize to start of day
+      
+      // First distribution should be 24 hours (1 day) after creation
+      const firstDistributionDate = new Date(creationDate.getTime() + 24 * 60 * 60 * 1000)
+      const firstDistributionDateStr = firstDistributionDate.toISOString().split('T')[0]
+      
+      // Check if we've reached the first distribution date
+      if (today < firstDistributionDateStr) {
+        const hoursUntilFirst = (firstDistributionDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+        console.log(`Plan ${plan.id} needs to wait ${hoursUntilFirst.toFixed(2)} more hours for first distribution`)
         continue
       }
 
       // Check if profit already distributed for today
-      // This ensures we don't distribute multiple times per day
-      const today = new Date().toISOString().split('T')[0]
-
       const { data: existingDistribution } = await supabaseAdmin
         .from('profit_distributions')
         .select('id')
@@ -75,9 +79,6 @@ async function distributeInvestmentProfits() {
         continue
       }
 
-      // Check if we need to catch up on missed days
-      const daysSinceCreation = Math.floor((now.getTime() - planCreatedAt.getTime()) / (1000 * 60 * 60 * 24))
-      
       // Get the last distribution date for this plan
       const { data: lastDistribution } = await supabaseAdmin
         .from('profit_distributions')
@@ -86,51 +87,31 @@ async function distributeInvestmentProfits() {
         .order('distribution_date', { ascending: false })
         .limit(1)
 
-      let startDate = planCreatedAt
-      if (lastDistribution && lastDistribution.length > 0) {
-        const lastDistDate = new Date(lastDistribution[0].distribution_date)
-        startDate = new Date(lastDistDate.getTime() + 24 * 60 * 60 * 1000) // Day after last distribution
-      } else {
-        // First distribution should be 24 hours after creation
-        startDate = new Date(planCreatedAt.getTime() + 24 * 60 * 60 * 1000)
-      }
-
-      // Calculate how many days we need to catch up
-      const daysToDistribute = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      let nextDistributionDate: Date
       
-      if (daysToDistribute <= 0) {
-        console.log(`Plan ${plan.id} is up to date, no distributions needed`)
-        continue
+      if (lastDistribution && lastDistribution.length > 0) {
+        // Next distribution is the day after the last distribution
+        const lastDistDate = new Date(lastDistribution[0].distribution_date + 'T00:00:00.000Z')
+        nextDistributionDate = new Date(lastDistDate.getTime() + 24 * 60 * 60 * 1000)
+      } else {
+        // This is the first distribution
+        nextDistributionDate = firstDistributionDate
       }
 
-      console.log(`Plan ${plan.id} needs ${daysToDistribute} day(s) of profit distribution`)
+      const nextDistributionDateStr = nextDistributionDate.toISOString().split('T')[0]
 
-      // Distribute profits for each missing day
-      for (let dayOffset = 0; dayOffset < daysToDistribute; dayOffset++) {
-        const distributionDate = new Date(startDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
-        const distributionDateStr = distributionDate.toISOString().split('T')[0]
-
-        // Skip if this date already has a distribution
-        const { data: existingForDate } = await supabaseAdmin
-          .from('profit_distributions')
-          .select('id')
-          .eq('plan_id', plan.id)
-          .eq('distribution_date', distributionDateStr)
-
-        if (existingForDate && existingForDate.length > 0) {
-          continue
-        }
-
+      // Only distribute if today is the next distribution date or later
+      if (today >= nextDistributionDateStr) {
         // Calculate daily profit
         const dailyProfitRate = plan.daily_percentage / 100
         const profitAmount = plan.investment_amount * dailyProfitRate
 
-        // Add to profit distributions
+        // Add to profit distributions (distribute for today)
         profitDistributions.push({
           plan_id: plan.id,
           user_id: plan.user_id,
           profit_amount: profitAmount,
-          distribution_date: distributionDateStr
+          distribution_date: today
         })
 
         // Accumulate user updates
@@ -140,7 +121,9 @@ async function distributeInvestmentProfits() {
           userUpdates.set(plan.user_id, profitAmount)
         }
 
-        console.log(`Queued profit distribution for plan ${plan.id} on ${distributionDateStr}: $${profitAmount.toFixed(8)}`)
+        console.log(`Queued profit distribution for plan ${plan.id} on ${today}: $${profitAmount.toFixed(8)}`)
+      } else {
+        console.log(`Plan ${plan.id} next distribution date is ${nextDistributionDateStr}, today is ${today}`)
       }
     }
 
@@ -278,20 +261,27 @@ async function distributeJrcStakingProfits() {
     const stakingDistributions = []
     const stakingUserUpdates = new Map()
 
-    for (const plan of stakingPlans) {
-      // Check if 24 hours have passed since staking plan creation
-      const planCreatedAt = new Date(plan.created_at)
-      const hoursSinceCreation = (now.getTime() - planCreatedAt.getTime()) / (1000 * 60 * 60)
+    const today = now.toISOString().split('T')[0]
 
-      // Only distribute if exactly 24 hours or more have passed since creation
-      if (hoursSinceCreation < 24) {
-        console.log(`Staking plan ${plan.id} created ${hoursSinceCreation.toFixed(2)} hours ago, needs to wait 24 hours`)
+    for (const plan of stakingPlans) {
+      const planCreatedAt = new Date(plan.created_at)
+      
+      // Calculate the next distribution date (24 hours after creation, then daily)
+      const creationDate = new Date(planCreatedAt.getTime())
+      creationDate.setUTCHours(0, 0, 0, 0) // Normalize to start of day
+      
+      // First distribution should be 24 hours (1 day) after creation
+      const firstDistributionDate = new Date(creationDate.getTime() + 24 * 60 * 60 * 1000)
+      const firstDistributionDateStr = firstDistributionDate.toISOString().split('T')[0]
+      
+      // Check if we've reached the first distribution date
+      if (today < firstDistributionDateStr) {
+        const hoursUntilFirst = (firstDistributionDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+        console.log(`Staking plan ${plan.id} needs to wait ${hoursUntilFirst.toFixed(2)} more hours for first distribution`)
         continue
       }
 
       // Check if profit already distributed for today
-      const today = new Date().toISOString().split('T')[0]
-
       const { data: existingDistribution } = await supabaseAdmin
         .from('jrc_staking_distributions')
         .select('id')
@@ -303,7 +293,7 @@ async function distributeJrcStakingProfits() {
         continue
       }
 
-      // Check if we need to catch up on missed days for JRC staking
+      // Get the last distribution date for this plan
       const { data: lastJrcDistribution } = await supabaseAdmin
         .from('jrc_staking_distributions')
         .select('distribution_date')
@@ -311,49 +301,31 @@ async function distributeJrcStakingProfits() {
         .order('distribution_date', { ascending: false })
         .limit(1)
 
-      let jrcStartDate = planCreatedAt
-      if (lastJrcDistribution && lastJrcDistribution.length > 0) {
-        const lastDistDate = new Date(lastJrcDistribution[0].distribution_date)
-        jrcStartDate = new Date(lastDistDate.getTime() + 24 * 60 * 60 * 1000)
-      } else {
-        jrcStartDate = new Date(planCreatedAt.getTime() + 24 * 60 * 60 * 1000)
-      }
-
-      const jrcDaysToDistribute = Math.floor((now.getTime() - jrcStartDate.getTime()) / (1000 * 60 * 60 * 24))
+      let nextDistributionDate: Date
       
-      if (jrcDaysToDistribute <= 0) {
-        console.log(`JRC staking plan ${plan.id} is up to date`)
-        continue
+      if (lastJrcDistribution && lastJrcDistribution.length > 0) {
+        // Next distribution is the day after the last distribution
+        const lastDistDate = new Date(lastJrcDistribution[0].distribution_date + 'T00:00:00.000Z')
+        nextDistributionDate = new Date(lastDistDate.getTime() + 24 * 60 * 60 * 1000)
+      } else {
+        // This is the first distribution
+        nextDistributionDate = firstDistributionDate
       }
 
-      console.log(`JRC staking plan ${plan.id} needs ${jrcDaysToDistribute} day(s) of profit distribution`)
+      const nextDistributionDateStr = nextDistributionDate.toISOString().split('T')[0]
 
-      // Distribute JRC profits for each missing day
-      for (let dayOffset = 0; dayOffset < jrcDaysToDistribute; dayOffset++) {
-        const distributionDate = new Date(jrcStartDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
-        const distributionDateStr = distributionDate.toISOString().split('T')[0]
-
-        // Skip if this date already has a distribution
-        const { data: existingForDate } = await supabaseAdmin
-          .from('jrc_staking_distributions')
-          .select('id')
-          .eq('staking_plan_id', plan.id)
-          .eq('distribution_date', distributionDateStr)
-
-        if (existingForDate && existingForDate.length > 0) {
-          continue
-        }
-
+      // Only distribute if today is the next distribution date or later
+      if (today >= nextDistributionDateStr) {
         // Calculate daily profit for JRC staking (in JRC coins)
         const dailyProfitRate = plan.daily_percentage / 100
         const profitAmount = plan.amount * dailyProfitRate
 
-        // Add to staking distributions
+        // Add to staking distributions (distribute for today)
         stakingDistributions.push({
           staking_plan_id: plan.id,
           user_id: plan.user_id,
           profit_amount: profitAmount,
-          distribution_date: distributionDateStr
+          distribution_date: today
         })
 
         // Accumulate user updates (JRC coins)
@@ -363,7 +335,9 @@ async function distributeJrcStakingProfits() {
           stakingUserUpdates.set(plan.user_id, profitAmount)
         }
 
-        console.log(`Queued JRC staking profit for plan ${plan.id} on ${distributionDateStr}: ${profitAmount.toFixed(2)} JRC`)
+        console.log(`Queued JRC staking profit for plan ${plan.id} on ${today}: ${profitAmount.toFixed(2)} JRC`)
+      } else {
+        console.log(`Staking plan ${plan.id} next distribution date is ${nextDistributionDateStr}, today is ${today}`)
       }
     }
 
@@ -464,47 +438,9 @@ async function distributeJrcStakingProfits() {
   }
 }
 
-// Global variable to store the interval ID
-let distributionInterval: NodeJS.Timeout | null = null
-
-// Function to run profit distribution automatically at specified intervals
-export function startProfitDistribution(intervalMinutes: number = 60) {
-  console.log(`Starting automated profit distribution system (every ${intervalMinutes} minutes)...`)
-  console.log('Users will receive investment profits every 24 hours after investing.')
-  console.log('Users will receive JRC staking profits every 24 hours after staking.')
-
-  // Clear any existing interval
-  if (distributionInterval) {
-    clearInterval(distributionInterval)
-  }
-
-  // Run immediately on start
-  distributeProfits().catch(error => {
-    console.error('Error in initial profit distribution:', error)
-  })
-
-  // Then run at specified intervals
-  distributionInterval = setInterval(() => {
-    distributeProfits().catch(error => {
-      console.error('Error in scheduled profit distribution:', error)
-    })
-  }, intervalMinutes * 60 * 1000) // Convert minutes to milliseconds
-
-  console.log(`Profit distribution interval set to ${intervalMinutes} minutes`)
-  return distributionInterval
-}
-
-// Function to stop automatic profit distribution
-export function stopProfitDistribution() {
-  if (distributionInterval) {
-    clearInterval(distributionInterval)
-    distributionInterval = null
-    console.log('Automatic profit distribution stopped')
-    return true
-  }
-  console.log('No active profit distribution to stop')
-  return false
-}
+// Profit distribution is now handled via:
+// 1. External cron jobs calling /api/auto-profit-distribution
+// 2. Manual admin button calling triggerProfitDistribution()
 
 // Manual trigger function for testing
 export async function triggerProfitDistribution() {

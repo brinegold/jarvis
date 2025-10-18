@@ -1,4 +1,7 @@
-import { startProfitDistribution } from './profit-distribution'
+// Server initialization - automatic scheduler removed
+// Profit distribution is now handled via:
+// 1. External cron jobs calling /api/auto-profit-distribution
+// 2. Manual admin button
 
 // Flag to ensure initialization only happens once
 let isInitialized = false
@@ -10,14 +13,7 @@ export function initializeServer() {
   }
 
   console.log('Initializing server components...')
-  
-  // Get interval from environment variable or default to 1 minute for testing
-  const intervalMinutes = process.env.PROFIT_DISTRIBUTION_INTERVAL 
-    ? parseInt(process.env.PROFIT_DISTRIBUTION_INTERVAL) 
-    : 1 // Default to 1 minute for testing
-  
-  // Start automatic profit distribution
-  startProfitDistribution(intervalMinutes)
+  console.log('Profit distribution system: External cron jobs + manual admin button')
   
   isInitialized = true
   console.log('Server initialization complete')

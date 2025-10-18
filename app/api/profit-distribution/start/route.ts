@@ -1,45 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { startProfitDistribution } from '@/lib/profit-distribution'
+import { NextResponse } from 'next/server'
 
-// This endpoint starts the automatic profit distribution
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json().catch(() => ({}))
-    const intervalMinutes = body.intervalMinutes || 60 // Default to 60 minutes
-    
-    // Start the automatic distribution
-    startProfitDistribution(intervalMinutes)
-    
-    return NextResponse.json({
-      success: true,
-      message: `Automatic profit distribution started (every ${intervalMinutes} minutes)`,
-      intervalMinutes
-    })
-  } catch (error: any) {
-    console.error('Error starting profit distribution:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to start profit distribution' },
-      { status: 500 }
-    )
-  }
+// This endpoint has been deprecated
+// Profit distribution is now handled via:
+// 1. External cron jobs calling /api/auto-profit-distribution
+// 2. Manual admin button
+
+export async function POST() {
+  return NextResponse.json({
+    success: false,
+    error: 'This endpoint has been deprecated',
+    message: 'Profit distribution is now handled via external cron jobs and manual admin button',
+    alternatives: {
+      cronJob: '/api/auto-profit-distribution (POST)',
+      manual: 'Admin dashboard "Distribute Profits" button'
+    }
+  }, { status: 410 }) // 410 Gone
 }
 
-// GET endpoint to start with default interval
-export async function GET(request: NextRequest) {
-  try {
-    // Start with default 60 minute interval
-    startProfitDistribution(60)
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Automatic profit distribution started (every 60 minutes)',
-      intervalMinutes: 60
-    })
-  } catch (error: any) {
-    console.error('Error starting profit distribution:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to start profit distribution' },
-      { status: 500 }
-    )
-  }
+export async function GET() {
+  return NextResponse.json({
+    success: false,
+    error: 'This endpoint has been deprecated',
+    message: 'Profit distribution is now handled via external cron jobs and manual admin button',
+    alternatives: {
+      cronJob: '/api/auto-profit-distribution (POST)',
+      manual: 'Admin dashboard "Distribute Profits" button'
+    }
+  }, { status: 410 }) // 410 Gone
 }

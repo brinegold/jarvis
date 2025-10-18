@@ -1,29 +1,29 @@
 import { NextResponse } from 'next/server'
-import { startProfitDistribution } from '@/lib/profit-distribution'
 
-// This endpoint initializes the server and starts automatic profit distribution
+// This endpoint initializes the server - profit distribution is now handled via cron jobs and manual admin button
 export async function GET() {
   try {
-    // Get interval from environment variable or default to 1 minute for testing
-    const intervalMinutes = process.env.PROFIT_DISTRIBUTION_INTERVAL 
-      ? parseInt(process.env.PROFIT_DISTRIBUTION_INTERVAL) 
-      : 1 // Default to 1 minute for testing
-    
-    console.log(`Initializing profit distribution with ${intervalMinutes} minute interval...`)
-    
-    // Start automatic profit distribution
-    startProfitDistribution(intervalMinutes)
+    console.log('🚀 Server initialization...')
     
     return NextResponse.json({
       success: true,
-      message: `Server initialized. Profit distribution running every ${intervalMinutes} minutes.`,
-      intervalMinutes,
+      message: 'Server initialized successfully.',
+      info: {
+        description: 'Profit distribution system',
+        method: 'External cron jobs + manual admin button',
+        distribution: 'Users receive profits every 24 hours after investing/staking',
+        endpoints: {
+          cronJob: '/api/auto-profit-distribution (POST)',
+          manual: 'Admin dashboard "Distribute Profits" button'
+        }
+      },
       timestamp: new Date().toISOString()
     })
   } catch (error: any) {
-    console.error('Error initializing server:', error)
+    console.error('❌ Error initializing server:', error)
     return NextResponse.json(
       { 
+        success: false,
         error: error.message || 'Failed to initialize server',
         timestamp: new Date().toISOString()
       },
