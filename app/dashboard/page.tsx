@@ -164,8 +164,27 @@ export default function DashboardPage() {
       // Process profit distributions data (for staking income)
       if (profitDistributionsResult.status === 'fulfilled' && !profitDistributionsResult.value.error) {
         const distributionsData = profitDistributionsResult.value.data || []
+        console.log('Profit distributions data:', distributionsData)
         const totalStakingIncome = distributionsData.reduce((sum: number, dist: any) => sum + (dist.profit_amount || 0), 0)
+        console.log('Total staking income calculated:', totalStakingIncome)
         setStakingIncome(totalStakingIncome)
+        
+        // If no profit distributions yet, fallback to investment plan profits
+        if (totalStakingIncome === 0 && plansData.length > 0) {
+          const fallbackIncome = plansData.reduce((sum: number, plan: any) => sum + (plan.total_profit_earned || 0), 0)
+          console.log('Using fallback staking income from investment plans:', fallbackIncome)
+          setStakingIncome(fallbackIncome)
+        }
+      } else {
+        console.error('Profit distributions query failed:', profitDistributionsResult)
+        // Fallback to investment plan profits if query fails
+        if (plansData.length > 0) {
+          const fallbackIncome = plansData.reduce((sum: number, plan: any) => sum + (plan.total_profit_earned || 0), 0)
+          console.log('Using fallback staking income due to query failure:', fallbackIncome)
+          setStakingIncome(fallbackIncome)
+        } else {
+          setStakingIncome(0)
+        }
       }
 
       // Process JRC staking data

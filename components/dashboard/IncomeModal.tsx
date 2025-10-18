@@ -87,6 +87,35 @@ export default function IncomeModal({
                   </div>
                 )}
                 
+                {selectedIncomeType === 'staking' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
+                    <div>
+                      <p className="text-gray-400">Profit Amount</p>
+                      <p className="text-white font-semibold">${item.profit_amount?.toFixed(8)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Plan Type</p>
+                      <p className="text-white">Plan {item.investment_plans?.plan_type}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Investment Amount</p>
+                      <p className="text-white">${item.investment_plans?.investment_amount?.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Daily Percentage</p>
+                      <p className="text-green-400">{item.investment_plans?.daily_percentage}%</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Distribution Date</p>
+                      <p className="text-white">{new Date(item.distribution_date).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Created At</p>
+                      <p className="text-white">{new Date(item.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                )}
+                
                 {selectedIncomeType === 'tokens' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
                     <div>
