@@ -106,6 +106,7 @@ export default function DashboardPage() {
         profileResult,
         plansResult,
         jrcStakingResult,
+        profitDistributionsResult,
         legacyCommissionsResult
       ] = await Promise.allSettled([
         // Profile query
@@ -128,6 +129,12 @@ export default function DashboardPage() {
           .select('*')
           .eq('user_id', user?.id)
           .order('created_at', { ascending: false }),
+        
+        // Profit distributions query (for staking income)
+        supabase
+          .from('profit_distributions')
+          .select('profit_amount')
+          .eq('user_id', user?.id),
         
         // Legacy referral commissions query (fallback)
         supabase
@@ -152,9 +159,13 @@ export default function DashboardPage() {
         // Calculate total profits from investment plans
         const calculatedProfits = plansData.reduce((sum: number, plan: any) => sum + (plan.total_profit_earned || 0), 0)
         setTotalProfits(calculatedProfits)
-        
-        // Set staking income to investment profits (this is what "Staking Income" refers to)
-        setStakingIncome(calculatedProfits)
+      }
+
+      // Process profit distributions data (for staking income)
+      if (profitDistributionsResult.status === 'fulfilled' && !profitDistributionsResult.value.error) {
+        const distributionsData = profitDistributionsResult.value.data || []
+        const totalStakingIncome = distributionsData.reduce((sum: number, dist: any) => sum + (dist.profit_amount || 0), 0)
+        setStakingIncome(totalStakingIncome)
       }
 
       // Process JRC staking data
@@ -291,13 +302,15 @@ export default function DashboardPage() {
           break
 
         case 'staking':
-          // Fetch USDT investment plans (staking income)
+          // Fetch profit distributions (actual staking income)
           const { data: stakingIncome, error: stakingError } = await supabase
-            .from('investment_plans')
-            .select('*')
+            .from('profit_distributions')
+            .select(`
+              *,
+              investment_plans!inner(plan_type, investment_amount, daily_percentage)
+            `)
             .eq('user_id', user?.id)
-            .eq('is_active', true)
-            .order('created_at', { ascending: false })
+            .order('distribution_date', { ascending: false })
           
           if (!stakingError) {
             setIncomeData(stakingIncome || [])
