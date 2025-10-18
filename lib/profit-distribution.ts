@@ -121,7 +121,7 @@ async function distributeInvestmentProfits() {
           userUpdates.set(plan.user_id, profitAmount)
         }
 
-        console.log(`Queued profit distribution for plan ${plan.id} on ${today}: $${profitAmount.toFixed(8)}`)
+        console.log(`Queued profit distribution for plan ${plan.id} on ${today} at ${new Date().toLocaleTimeString()}: $${profitAmount.toFixed(8)}`)
       } else {
         console.log(`Plan ${plan.id} next distribution date is ${nextDistributionDateStr}, today is ${today}`)
       }
@@ -335,7 +335,7 @@ async function distributeJrcStakingProfits() {
           stakingUserUpdates.set(plan.user_id, profitAmount)
         }
 
-        console.log(`Queued JRC staking profit for plan ${plan.id} on ${today}: ${profitAmount.toFixed(2)} JRC`)
+        console.log(`Queued JRC staking profit for plan ${plan.id} on ${today} at ${new Date().toLocaleTimeString()}: ${profitAmount.toFixed(2)} JRC`)
       } else {
         console.log(`Staking plan ${plan.id} next distribution date is ${nextDistributionDateStr}, today is ${today}`)
       }
