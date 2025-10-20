@@ -17,7 +17,8 @@ import {
   RefreshCw,
   FileText,
   Users,
-  CreditCard
+  CreditCard,
+  Coins
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -41,6 +42,7 @@ interface Transaction {
 interface TransactionStats {
   totalTransactions: number
   totalVolume: number
+  totalJrcVolume: number
   totalFees: number
   pendingCount: number
   completedCount: number
@@ -54,6 +56,7 @@ export default function AdminTransactionsPage() {
   const [stats, setStats] = useState<TransactionStats>({
     totalTransactions: 0,
     totalVolume: 0,
+    totalJrcVolume: 0,
     totalFees: 0,
     pendingCount: 0,
     completedCount: 0,
@@ -175,7 +178,16 @@ export default function AdminTransactionsPage() {
 
       // Calculate statistics
       const totalTransactions = processedTransactions.length
-      const totalVolume = processedTransactions.reduce((sum, t) => sum + (t.amount || 0), 0)
+      
+      // Separate USDT and JRC volumes
+      const totalVolume = processedTransactions
+        .filter(t => !t.description?.includes('JRC Staking'))
+        .reduce((sum, t) => sum + (t.amount || 0), 0)
+      
+      const totalJrcVolume = processedTransactions
+        .filter(t => t.description?.includes('JRC Staking'))
+        .reduce((sum, t) => sum + (t.amount || 0), 0)
+      
       const totalFees = processedTransactions.reduce((sum, t) => sum + (t.fee || 0), 0)
       const pendingCount = processedTransactions.filter(t => t.status === 'pending').length
       const completedCount = processedTransactions.filter(t => t.status === 'completed').length
@@ -184,6 +196,7 @@ export default function AdminTransactionsPage() {
       setStats({
         totalTransactions,
         totalVolume,
+        totalJrcVolume,
         totalFees,
         pendingCount,
         completedCount,
@@ -362,7 +375,7 @@ export default function AdminTransactionsPage() {
 
       <div className="container mx-auto p-6">
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 mb-8">
           <div className="jarvis-card rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -376,10 +389,20 @@ export default function AdminTransactionsPage() {
           <div className="jarvis-card rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-300 text-sm">Total Volume</p>
+                <p className="text-gray-300 text-sm">USDT Volume</p>
                 <p className="text-2xl font-bold text-white">${stats.totalVolume.toFixed(2)}</p>
               </div>
               <DollarSign className="h-8 w-8 text-green-400" />
+            </div>
+          </div>
+
+          <div className="jarvis-card rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-300 text-sm">JRC Volume</p>
+                <p className="text-2xl font-bold text-white">{stats.totalJrcVolume.toFixed(0)} JRC</p>
+              </div>
+              <Coins className="h-8 w-8 text-yellow-400" />
             </div>
           </div>
 

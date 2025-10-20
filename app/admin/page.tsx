@@ -25,6 +25,7 @@ interface AdminStats {
   pendingWithdrawals: number
   totalWithdrawals: number
   totalInvestments: number
+  totalJrcVolume: number
   totalTransactions: number
   dailyTransactions: number
 }
@@ -47,6 +48,7 @@ export default function AdminDashboard() {
     pendingWithdrawals: 0,
     totalWithdrawals: 0,
     totalInvestments: 0,
+    totalJrcVolume: 0,
     totalTransactions: 0,
     dailyTransactions: 0
   })
@@ -93,11 +95,12 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       // Fetch stats
-      const [usersCount, withdrawalsData, investmentsData, transactionsData] = await Promise.all([
+      const [usersCount, withdrawalsData, investmentsData, transactionsData, jrcTransactionsData] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact' }),
         supabase.from('withdrawal_requests').select('*'),
         supabase.from('investment_plans').select('investment_amount'),
-        supabase.from('transactions').select('created_at', { count: 'exact' })
+        supabase.from('transactions').select('created_at', { count: 'exact' }),
+        supabase.from('transactions').select('amount, description').like('description', '%JRC Staking%')
       ])
 
       // Calculate daily transactions (today)
@@ -111,12 +114,14 @@ export default function AdminDashboard() {
       const pendingWithdrawalsCount = withdrawalsData.data?.filter(w => w.status === 'pending').length || 0
       const totalWithdrawalsAmount = withdrawalsData.data?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0
       const totalInvestmentsAmount = investmentsData.data?.reduce((sum, i) => sum + (i.investment_amount || 0), 0) || 0
+      const totalJrcVolumeAmount = jrcTransactionsData.data?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0
 
       setStats({
         totalUsers: usersCount.count || 0,
         pendingWithdrawals: pendingWithdrawalsCount,
         totalWithdrawals: totalWithdrawalsAmount,
         totalInvestments: totalInvestmentsAmount,
+        totalJrcVolume: totalJrcVolumeAmount,
         totalTransactions: transactionsData.count || 0,
         dailyTransactions: dailyTransactionsCount || 0
       })
@@ -362,6 +367,16 @@ export default function AdminDashboard() {
                 <p className="text-3xl font-bold text-purple-400">${stats.totalInvestments.toFixed(2)}</p>
               </div>
               <TrendingUp className="h-12 w-12 text-purple-400" />
+            </div>
+          </div>
+
+          <div className="jarvis-card rounded-2xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-300 text-sm">Total JRC Volume</p>
+                <p className="text-3xl font-bold text-yellow-400">{stats.totalJrcVolume.toFixed(0)} JRC</p>
+              </div>
+              <Coins className="h-12 w-12 text-yellow-400" />
             </div>
           </div>
 

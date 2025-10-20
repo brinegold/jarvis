@@ -495,7 +495,7 @@ export default function DashboardPage() {
                 <Youtube className="h-4 w-4 sm:h-5 sm:w-5" />
               </a>
               <a 
-                href="https://t.me/Jarvistaking" 
+                href="mailto:jarvissupport@atomicmail.io" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="p-1.5 sm:p-2 text-white hover:bg-blue-500/20 hover:text-blue-400 rounded-full transition-all duration-300"
