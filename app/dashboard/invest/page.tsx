@@ -129,7 +129,7 @@ export default function InvestPage() {
         .from('transactions')
         .insert({
           user_id: user?.id,
-          transaction_type: 'deposit',
+          transaction_type: 'investment',
           amount: investAmount,
           net_amount: investAmount,
           status: 'completed',

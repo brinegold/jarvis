@@ -92,7 +92,7 @@ export default function StakingPage() {
         .from('transactions')
         .insert({
           user_id: user?.id,
-          transaction_type: 'deposit',
+          transaction_type: 'staking',
           amount: stakingAmount,
           net_amount: stakingAmount,
           status: 'completed',

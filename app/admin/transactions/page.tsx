@@ -73,6 +73,8 @@ export default function AdminTransactionsPage() {
   const transactionTypes = [
     { value: 'all', label: 'All Types' },
     { value: 'deposit', label: 'Deposits' },
+    { value: 'investment', label: 'Investments' },
+    { value: 'staking', label: 'Staking' },
     { value: 'withdrawal', label: 'Withdrawals' },
     { value: 'profit', label: 'Profits' },
     { value: 'referral_bonus', label: 'Referral Bonuses' },
@@ -270,6 +272,8 @@ export default function AdminTransactionsPage() {
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'deposit': return 'text-green-400'
+      case 'investment': return 'text-cyan-400'
+      case 'staking': return 'text-indigo-400'
       case 'withdrawal': return 'text-red-400'
       case 'profit': return 'text-blue-400'
       case 'referral_bonus': return 'text-purple-400'
@@ -542,7 +546,10 @@ export default function AdminTransactionsPage() {
                     </td>
                     <td className="p-4">
                       <span className="text-white font-semibold">
-                        ${transaction.amount.toFixed(2)}
+                        {transaction.description?.includes('JRC Staking') 
+                          ? `${transaction.amount.toFixed(0)} JRC`
+                          : `$${transaction.amount.toFixed(2)}`
+                        }
                       </span>
                     </td>
                     <td className="p-4">
@@ -552,7 +559,10 @@ export default function AdminTransactionsPage() {
                     </td>
                     <td className="p-4">
                       <span className="text-white font-semibold">
-                        ${transaction.net_amount.toFixed(2)}
+                        {transaction.description?.includes('JRC Staking') 
+                          ? `${transaction.net_amount.toFixed(0)} JRC`
+                          : `$${transaction.net_amount.toFixed(2)}`
+                        }
                       </span>
                     </td>
                     <td className="p-4">
@@ -639,7 +649,12 @@ export default function AdminTransactionsPage() {
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Amount</p>
-                  <p className="text-white font-semibold text-lg">${selectedTransaction.amount.toFixed(2)}</p>
+                  <p className="text-white font-semibold text-lg">
+                    {selectedTransaction.description?.includes('JRC Staking') 
+                      ? `${selectedTransaction.amount.toFixed(0)} JRC`
+                      : `$${selectedTransaction.amount.toFixed(2)}`
+                    }
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Fee</p>
@@ -647,7 +662,12 @@ export default function AdminTransactionsPage() {
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Net Amount</p>
-                  <p className="text-white font-semibold text-lg">${selectedTransaction.net_amount.toFixed(2)}</p>
+                  <p className="text-white font-semibold text-lg">
+                    {selectedTransaction.description?.includes('JRC Staking') 
+                      ? `${selectedTransaction.net_amount.toFixed(0)} JRC`
+                      : `$${selectedTransaction.net_amount.toFixed(2)}`
+                    }
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Status</p>
