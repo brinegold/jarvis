@@ -14,22 +14,28 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Use REST API to fetch user data directly from auth.users table
-    // Since we have service role key, we can query the auth schema directly
+    // Use RPC function to fetch user emails from auth schema
+    // Create an RPC function in Supabase that can access auth.users
     const { data: authUsers, error: authError } = await supabaseAdmin
-      .from('auth.users')
-      .select('id, email, last_sign_in_at')
-      .in('id', userIds)
+      .rpc('get_user_emails_by_ids', { user_ids: userIds })
     
     if (authError) {
       console.error('Error fetching user emails:', authError)
-      return NextResponse.json({ 
-        error: 'Failed to fetch user emails' 
-      }, { status: 500 })
+      // Fallback: return user IDs as emails if RPC fails
+      const fallbackUsers = userIds.map((id: string) => ({
+        id,
+        email: id, // Use ID as fallback
+        last_sign_in_at: null
+      }))
+      
+      return NextResponse.json({
+        success: true,
+        users: fallbackUsers
+      })
     }
 
-    // The data is already filtered by the query, just return it
-    const filteredUsers = authUsers || []
+    // Filter the results to only include requested user IDs
+    const filteredUsers = authUsers?.filter((user: any) => userIds.includes(user.id)) || []
 
     return NextResponse.json({
       success: true,

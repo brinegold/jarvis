@@ -220,6 +220,13 @@ export default function UsersManagement() {
     }
   }, [supabase])
 
+  // Check admin access and fetch users when component mounts or user changes
+  useEffect(() => {
+    if (!loading && user) {
+      checkAdminAndFetch()
+    }
+  }, [loading, user, checkAdminAndFetch])
+
   // Filter users based on search and status
   useEffect(() => {
     let filtered = users
