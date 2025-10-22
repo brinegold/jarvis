@@ -89,6 +89,17 @@ export default function WithdrawalsManagement() {
       console.log('Raw withdrawal data:', data) // Debug log
       console.log('Pending withdrawals:', data?.filter(w => w.status === 'pending')) // Debug log
 
+      // Fetch emails separately using the admin API
+      let emailData: { emails?: Record<string, string> } = { emails: {} }
+      try {
+        const emailResponse = await fetch('/api/admin/get-user-emails')
+        if (emailResponse.ok) {
+          emailData = await emailResponse.json()
+        }
+      } catch (emailError) {
+        console.error('Error fetching user emails:', emailError)
+      }
+
       const formattedWithdrawals = data?.map(w => ({
         id: w.id,
         user_id: w.user_id,
@@ -97,12 +108,12 @@ export default function WithdrawalsManagement() {
         status: w.status,
         created_at: w.created_at,
         processed_at: w.processed_at,
-        user_email: w.user_id, // Use user_id as fallback since email is in auth.users
-        username: w.profiles.username,
+        user_email: emailData.emails?.[w.user_id] || w.user_id, // Use actual email or fallback to user_id
+        username: w.profiles.username || 'Unknown User',
         main_wallet_balance: w.profiles.main_wallet_balance
       })) || []
 
-      console.log('Formatted withdrawals:', formattedWithdrawals) // Debug log
+      console.log('Formatted withdrawals with emails:', formattedWithdrawals) // Debug log
       setWithdrawals(formattedWithdrawals)
     } catch (error) {
       console.error('Error fetching withdrawals:', error)

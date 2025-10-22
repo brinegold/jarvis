@@ -17,15 +17,30 @@ class BSCService {
   private usdtContract!: Contract<any>;
   private config: BSCConfig;
   private account: any;
+  private rpcProviders: string[];
+  private currentRpcIndex: number = 0;
+  private requestQueue: Promise<any>[] = [];
+  private lastRequestTime: number = 0;
+  private readonly REQUEST_DELAY = 200; // 200ms between requests
+  private balanceCache: Map<string, {balance: string, timestamp: number}> = new Map();
+  private readonly CACHE_DURATION = 30000; // 30 seconds cache
 
   constructor(config: BSCConfig) {
     this.config = config;
     
-    // Use BSC mainnet RPC URL
-    const rpcUrl = config.rpcUrl || "https://bsc-dataseed1.binance.org/";
-    console.log("BSC Service initialized with RPC:", rpcUrl);
+    // Multiple RPC providers for fallback
+    this.rpcProviders = [
+      config.rpcUrl || "https://bsc-dataseed1.binance.org/",
+      "https://bsc-dataseed2.binance.org/",
+      "https://bsc-dataseed3.binance.org/",
+      "https://bsc-dataseed4.binance.org/",
+      "https://rpc.ankr.com/bsc",
+      "https://bsc.publicnode.com"
+    ];
     
-    this.web3 = new Web3(rpcUrl);
+    console.log("BSC Service initialized with RPC providers:", this.rpcProviders.length);
+    
+    this.web3 = new Web3(this.rpcProviders[0]);
     
     // Test connection
     this.testConnection();
@@ -214,26 +229,165 @@ class BSCService {
     }
   }
 
-  // Get USDT balance of an address
-  async getUSDTBalance(address: string): Promise<string> {
-    try {
-      const balance = await this.usdtContract.methods.balanceOf(address).call() as string;
-      return this.web3.utils.fromWei(balance, 'ether');
-    } catch (error) {
-      console.error('Error getting USDT balance:', error);
-      throw error;
+  // Rate limiting helper
+  private async rateLimitedRequest<T>(requestFn: () => Promise<T>): Promise<T> {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    
+    if (timeSinceLastRequest < this.REQUEST_DELAY) {
+      await new Promise(resolve => setTimeout(resolve, this.REQUEST_DELAY - timeSinceLastRequest));
     }
+    
+    this.lastRequestTime = Date.now();
+    return await requestFn();
   }
 
-  // Get BNB balance of an address
-  async getBNBBalance(address: string): Promise<string> {
-    try {
-      const balance = await this.web3.eth.getBalance(address);
-      return this.web3.utils.fromWei(balance, 'ether');
-    } catch (error) {
-      console.error('Error getting BNB balance:', error);
-      throw error;
+  // Retry with exponential backoff and RPC fallback
+  private async retryWithFallback<T>(operation: () => Promise<T>, maxRetries: number = 3): Promise<T> {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await this.rateLimitedRequest(operation);
+      } catch (error: any) {
+        lastError = error;
+        
+        // Check if it's a rate limit error
+        if (error.code === 101 || error.code === -32005 || error.message?.includes('limit exceeded')) {
+          console.log(`Rate limit hit on attempt ${attempt + 1}, trying fallback RPC...`);
+          
+          // Switch to next RPC provider
+          this.currentRpcIndex = (this.currentRpcIndex + 1) % this.rpcProviders.length;
+          const newRpcUrl = this.rpcProviders[this.currentRpcIndex];
+          
+          console.log(`Switching to RPC provider: ${newRpcUrl}`);
+          this.web3 = new Web3(newRpcUrl);
+          this.initializeContracts(); // Reinitialize contracts with new provider
+          
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.pow(2, attempt) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        // For non-rate-limit errors, retry with shorter delay
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
     }
+    
+    throw lastError;
+  }
+
+  // Get USDT balance of an address with retry logic and caching
+  async getUSDTBalance(address: string): Promise<string> {
+    const cacheKey = `usdt_${address}`;
+    const cached = this.balanceCache.get(cacheKey);
+    
+    // Return cached result if still valid
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+      return cached.balance;
+    }
+    
+    const balance = await this.retryWithFallback(async () => {
+      try {
+        const balance = await this.usdtContract.methods.balanceOf(address).call() as string;
+        return this.web3.utils.fromWei(balance, 'ether');
+      } catch (error) {
+        console.error(`Error getting USDT balance for ${address}:`, error);
+        throw error;
+      }
+    });
+    
+    // Cache the result
+    this.balanceCache.set(cacheKey, { balance, timestamp: Date.now() });
+    return balance;
+  }
+
+  // Get BNB balance of an address with retry logic
+  async getBNBBalance(address: string): Promise<string> {
+    return await this.retryWithFallback(async () => {
+      try {
+        const balance = await this.web3.eth.getBalance(address);
+        return this.web3.utils.fromWei(balance, 'ether');
+      } catch (error) {
+        console.error(`Error getting BNB balance for ${address}:`, error);
+        throw error;
+      }
+    });
+  }
+
+  // Batch balance checking with controlled concurrency
+  async getBatchBalances(addresses: string[], batchSize: number = 5): Promise<Array<{
+    address: string,
+    usdtBalance: string,
+    bnbBalance: string,
+    error?: string
+  }>> {
+    const results: Array<{
+      address: string,
+      usdtBalance: string,
+      bnbBalance: string,
+      error?: string
+    }> = [];
+
+    console.log(`Checking balances for ${addresses.length} addresses in batches of ${batchSize}`);
+
+    // Process addresses in batches to avoid overwhelming the RPC
+    for (let i = 0; i < addresses.length; i += batchSize) {
+      const batch = addresses.slice(i, i + batchSize);
+      console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(addresses.length / batchSize)}`);
+
+      const batchPromises = batch.map(async (address) => {
+        try {
+          // Get both balances with a small delay between calls
+          const [usdtBalance, bnbBalance] = await Promise.all([
+            this.getUSDTBalance(address),
+            new Promise<string>(resolve => 
+              setTimeout(() => resolve(this.getBNBBalance(address)), 100)
+            )
+          ]);
+
+          return {
+            address,
+            usdtBalance,
+            bnbBalance
+          };
+        } catch (error: any) {
+          console.error(`Error getting balances for ${address}:`, error.message);
+          return {
+            address,
+            usdtBalance: '0',
+            bnbBalance: '0',
+            error: error.message
+          };
+        }
+      });
+
+      // Wait for current batch to complete before starting next batch
+      const batchResults = await Promise.allSettled(batchPromises);
+      
+      batchResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          results.push({
+            address: batch[index],
+            usdtBalance: '0',
+            bnbBalance: '0',
+            error: result.reason?.message || 'Unknown error'
+          });
+        }
+      });
+
+      // Add delay between batches to respect rate limits
+      if (i + batchSize < addresses.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    return results;
   }
 
   // Transfer USDT tokens
@@ -299,85 +453,136 @@ class BSCService {
     }
   }
 
-  // Scan all user wallets and collect tokens (admin function)
+  // Scan all user wallets and collect tokens (admin function) - OPTIMIZED
   async scanAndCollectFromUserWallets(userIds: string[]): Promise<{
     scannedWallets: number,
     usdtCollections: Array<{userId: string, address: string, amount: string, txHash: string}>,
     bnbCollections: Array<{userId: string, address: string, amount: string, txHash: string}>,
     errors: Array<{userId: string, address: string, error: string}>
   }> {
-    console.log(`Starting collection scan for ${userIds.length} user wallets`);
+    console.log(`Starting OPTIMIZED collection scan for ${userIds.length} user wallets`);
     
     const results = {
-      scannedWallets: 0,
+      scannedWallets: userIds.length,
       usdtCollections: [] as Array<{userId: string, address: string, amount: string, txHash: string}>,
       bnbCollections: [] as Array<{userId: string, address: string, amount: string, txHash: string}>,
       errors: [] as Array<{userId: string, address: string, error: string}>
     };
 
-    for (const userId of userIds) {
-      try {
-        const userWallet = this.generateUserWallet(userId);
-        results.scannedWallets++;
-        
-        // Check USDT balance
-        const usdtBalance = await this.getUSDTBalance(userWallet.address);
-        const usdtBalanceNum = parseFloat(usdtBalance);
-        
-        if (usdtBalanceNum > 0.01) { // Collect if more than 0.01 USDT
-          try {
-            // Ensure user has BNB for gas
-            const bnbBalance = await this.getBNBBalance(userWallet.address);
-            if (parseFloat(bnbBalance) < 0.001) {
-              await this.sendBNBForGas(userWallet.address, '0.002');
-              await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for confirmation
-            }
-            
-            const txHash = await this.transferUSDT(
-              userWallet.privateKey,
-              this.config.globalAdminWallet || this.config.adminFeeWallet || '',
-              usdtBalance
-            );
-            
-            results.usdtCollections.push({
-              userId,
-              address: userWallet.address,
-              amount: usdtBalance,
-              txHash
-            });
-          } catch (usdtError: any) {
-            results.errors.push({
-              userId,
-              address: userWallet.address,
-              error: `USDT collection failed: ${usdtError.message}`
-            });
-          }
-        }
-        
-        // Check and collect BNB (after USDT collection)
-        const bnbRecoveryTx = await this.recoverBNBFromUserWallet(userWallet.privateKey, userWallet.address);
-        if (bnbRecoveryTx) {
-          const bnbBalance = await this.getBNBBalance(userWallet.address);
-          results.bnbCollections.push({
-            userId,
-            address: userWallet.address,
-            amount: bnbBalance,
-            txHash: bnbRecoveryTx
-          });
-        }
-        
-      } catch (error: any) {
-        const userWallet = this.generateUserWallet(userId);
+    // Generate all wallet addresses first
+    const walletData = userIds.map(userId => ({
+      userId,
+      wallet: this.generateUserWallet(userId)
+    }));
+
+    const addresses = walletData.map(w => w.wallet.address);
+    
+    // Batch check all balances at once (much more efficient)
+    console.log('Batch checking balances for all wallets...');
+    const balanceResults = await this.getBatchBalances(addresses, 10); // Larger batch size for scanning
+    
+    // Process results
+    for (let i = 0; i < walletData.length; i++) {
+      const { userId, wallet } = walletData[i];
+      const balanceResult = balanceResults[i];
+      
+      if (balanceResult.error) {
         results.errors.push({
           userId,
-          address: userWallet.address,
-          error: `Wallet scan failed: ${error.message}`
+          address: wallet.address,
+          error: `Balance check failed: ${balanceResult.error}`
         });
+        continue;
+      }
+
+      const usdtBalanceNum = parseFloat(balanceResult.usdtBalance);
+      const bnbBalanceNum = parseFloat(balanceResult.bnbBalance);
+        
+      if (usdtBalanceNum > 0.01) { // Collect if more than 0.01 USDT
+        try {
+          // Use the already fetched BNB balance from batch result
+          if (bnbBalanceNum < 0.001) {
+            await this.sendBNBForGas(wallet.address, '0.002');
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for confirmation
+          }
+          
+          const txHash = await this.transferUSDT(
+            wallet.privateKey,
+            this.config.globalAdminWallet || this.config.adminFeeWallet || '',
+            balanceResult.usdtBalance
+          );
+          
+          results.usdtCollections.push({
+            userId,
+            address: wallet.address,
+            amount: balanceResult.usdtBalance,
+            txHash
+          });
+        } catch (usdtError: any) {
+          results.errors.push({
+            userId,
+            address: wallet.address,
+            error: `USDT collection failed: ${usdtError.message}`
+          });
+        }
+      }
+      
+      // Collect BNB if there's a significant amount (skip gas collection for small amounts)
+      if (bnbBalanceNum > 0.005) { // Only collect if more than 0.005 BNB
+        try {
+          // Recover BNB from user wallet to admin wallet
+          const txHash = await this.recoverBNBFromUserWallet(wallet.privateKey, wallet.address);
+          
+          if (txHash) {
+            results.bnbCollections.push({
+              userId,
+              address: wallet.address,
+              amount: balanceResult.bnbBalance,
+              txHash
+            });
+          }
+        } catch (bnbError: any) {
+          results.errors.push({
+            userId,
+            address: wallet.address,
+            error: `BNB collection failed: ${bnbError.message}`
+          });
+        }
       }
     }
     
     console.log(`Collection scan completed: ${results.usdtCollections.length} USDT, ${results.bnbCollections.length} BNB, ${results.errors.length} errors`);
     return results;
+  }
+
+  // Collect USDT from wallet address with private key
+  async collectUSDTFromWalletWithKey(walletAddress: string, privateKey: string): Promise<{success: boolean, txHash?: string, amount?: string, error?: string}> {
+    try {
+      const usdtBalance = await this.getUSDTBalance(walletAddress);
+      const usdtBalanceNum = parseFloat(usdtBalance);
+      
+      if (usdtBalanceNum <= 0.01) {
+        return { success: false, error: 'Insufficient USDT balance to collect' };
+      }
+      
+      // Ensure wallet has BNB for gas
+      const bnbBalance = await this.getBNBBalance(walletAddress);
+      if (parseFloat(bnbBalance) < 0.001) {
+        await this.sendBNBForGas(walletAddress, '0.002');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+      
+      const txHash = await this.transferUSDT(
+        privateKey,
+        this.config.globalAdminWallet || this.config.adminFeeWallet || '',
+        usdtBalance
+      );
+      
+      return { success: true, txHash, amount: usdtBalance };
+    } catch (error: any) {
+      console.error('Error collecting USDT from wallet:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // Collect USDT from specific user wallet (admin function)
@@ -405,6 +610,22 @@ class BSCService {
       );
       
       return { success: true, txHash, amount: usdtBalance };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Collect BNB from wallet address with private key
+  async collectBNBFromWalletWithKey(walletAddress: string, privateKey: string): Promise<{success: boolean, txHash?: string, amount?: string, error?: string}> {
+    try {
+      const bnbRecoveryTx = await this.recoverBNBFromUserWallet(privateKey, walletAddress);
+      
+      if (!bnbRecoveryTx) {
+        return { success: false, error: 'No BNB to collect or amount too small' };
+      }
+      
+      const bnbBalance = await this.getBNBBalance(walletAddress);
+      return { success: true, txHash: bnbRecoveryTx, amount: bnbBalance };
     } catch (error: any) {
       return { success: false, error: error.message };
     }

@@ -40,6 +40,7 @@ interface UserProfile {
   total_investments: number
   total_withdrawals: number
   referral_count: number
+  usdt_team_volume: number
 }
 
 export default function UsersManagement() {
@@ -163,9 +164,75 @@ export default function UsersManagement() {
         withdrawalMap.set(userId, currentTotal + (wd.amount || 0))
       })
 
+      // Debug logging
+      console.log('Investment data sample:', investmentData?.slice(0, 3))
+      console.log('Investment map size:', investmentMap.size)
+      console.log('Users data sample:', usersData?.slice(0, 3)?.map(u => ({ id: u.id, referral_code: u.referral_code, sponsor_id: u.sponsor_id })))
+      console.log('Total users:', usersData?.length)
+
       // Fetch referral counts efficiently using RPC or aggregation
       const { data: referralCounts, error: referralError } = await supabase
         .rpc('get_referral_counts')
+
+      // Calculate USDT team volume for each user
+      const calculateTeamVolume = (userId: string, userReferralCode: string) => {
+        if (!userReferralCode) return 0
+        
+        // Get all team members - try both possible relationships
+        // Method 1: sponsor_id matches referral_code
+        let teamMembers = usersData?.filter(u => u.sponsor_id === userReferralCode) || []
+        
+        // Method 2: If no results, try sponsor_id matches userId (fallback)
+        if (teamMembers.length === 0) {
+          teamMembers = usersData?.filter(u => u.sponsor_id === userId) || []
+        }
+        
+        // Calculate total investments of team members
+        let teamVolume = 0
+        teamMembers.forEach(member => {
+          const memberInvestment = investmentMap.get(member.id) || 0
+          teamVolume += memberInvestment
+          
+          // Recursively calculate volume from sub-teams (multi-level)
+          if (member.referral_code) {
+            const subTeamVolume = calculateSubTeamVolume(member.id, member.referral_code)
+            teamVolume += subTeamVolume
+          }
+        })
+        
+        // Debug logging for users with team members
+        if (teamMembers.length > 0) {
+          console.log(`User ${userId} (${userReferralCode}) has ${teamMembers.length} team members with total volume: $${teamVolume}`)
+          console.log('Team members:', teamMembers.map(m => ({ id: m.id, referral_code: m.referral_code, investment: investmentMap.get(m.id) || 0 })))
+        }
+        
+        return teamVolume
+      }
+
+      const calculateSubTeamVolume = (userId: string, userReferralCode: string): number => {
+        if (!userReferralCode) return 0
+        
+        // Get sub-team members using referral_code
+        let subTeamMembers = usersData?.filter(u => u.sponsor_id === userReferralCode) || []
+        
+        // Fallback to userId if no results
+        if (subTeamMembers.length === 0) {
+          subTeamMembers = usersData?.filter(u => u.sponsor_id === userId) || []
+        }
+        
+        let subVolume = 0
+        
+        subTeamMembers.forEach(member => {
+          const memberInvestment = investmentMap.get(member.id) || 0
+          subVolume += memberInvestment
+          // Recursive call for deeper levels
+          if (member.referral_code) {
+            subVolume += calculateSubTeamVolume(member.id, member.referral_code)
+          }
+        })
+        
+        return subVolume
+      }
 
       if (referralError) {
         console.warn('RPC get_referral_counts not available, using fallback method')
@@ -186,30 +253,58 @@ export default function UsersManagement() {
         })
 
         // Process data with optimized lookups
-        var processedUsers = usersData?.map(user => {
+        var processedUsers = usersData?.map((user, index) => {
           const authData = emailMap.get(user.id)
+          const teamVolume = calculateTeamVolume(user.id, user.referral_code)
+          
+          // Debug log for first few users
+          if (index < 5) {
+            console.log(`Processing user ${index + 1}:`, {
+              id: user.id,
+              referral_code: user.referral_code,
+              sponsor_id: user.sponsor_id,
+              own_investment: investmentMap.get(user.id) || 0,
+              team_volume: teamVolume
+            })
+          }
+          
           return {
             ...user,
             user_email: authData?.email || user.id, // Use email from auth.users or fallback to user_id
             last_sign_in_at: authData?.last_sign_in_at,
             total_investments: investmentMap.get(user.id) || 0,
             total_withdrawals: withdrawalMap.get(user.id) || 0,
-            referral_count: referralCountMap.get(user.referral_code) || 0
+            referral_count: referralCountMap.get(user.referral_code) || 0,
+            usdt_team_volume: teamVolume
           }
         }) || []
       } else {
         // Use RPC result if available
         const referralCountMap = new Map(referralCounts?.map((rc: { referral_code: string; count: number }) => [rc.referral_code, rc.count]) || [])
         
-        var processedUsers = usersData?.map(user => {
+        var processedUsers = usersData?.map((user, index) => {
           const authData = emailMap.get(user.id)
+          const teamVolume = calculateTeamVolume(user.id, user.referral_code)
+          
+          // Debug log for first few users
+          if (index < 5) {
+            console.log(`Processing user ${index + 1} (RPC branch):`, {
+              id: user.id,
+              referral_code: user.referral_code,
+              sponsor_id: user.sponsor_id,
+              own_investment: investmentMap.get(user.id) || 0,
+              team_volume: teamVolume
+            })
+          }
+          
           return {
             ...user,
             user_email: authData?.email || user.id, // Use email from auth.users or fallback to user_id
             last_sign_in_at: authData?.last_sign_in_at,
             total_investments: investmentMap.get(user.id) || 0,
             total_withdrawals: withdrawalMap.get(user.id) || 0,
-            referral_count: referralCountMap.get(user.referral_code) || 0
+            referral_count: referralCountMap.get(user.referral_code) || 0,
+            usdt_team_volume: teamVolume
           }
         }) || []
       }
@@ -608,7 +703,7 @@ export default function UsersManagement() {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
                         <div>
                           <p className="text-gray-400">Main Wallet</p>
                           <p className="text-white font-semibold">${userProfile.main_wallet_balance.toFixed(2)}</p>
@@ -624,6 +719,10 @@ export default function UsersManagement() {
                         <div>
                           <p className="text-gray-400">Investments</p>
                           <p className="text-green-400">${userProfile.total_investments.toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Team Volume</p>
+                          <p className="text-purple-400">${userProfile.usdt_team_volume.toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-gray-400">Referrals</p>
@@ -857,7 +956,7 @@ export default function UsersManagement() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white/5 rounded-lg p-4">
                   <p className="text-gray-400 text-sm">Total Investments</p>
                   <p className="text-xl font-bold text-green-400">${selectedUser.total_investments.toFixed(2)}</p>
@@ -869,6 +968,13 @@ export default function UsersManagement() {
                 <div className="bg-white/5 rounded-lg p-4">
                   <p className="text-gray-400 text-sm">Referrals</p>
                   <p className="text-xl font-bold text-blue-400">{selectedUser.referral_count}</p>
+                </div>
+                <div className="bg-white/5 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-purple-400" />
+                    <p className="text-gray-400 text-sm">USDT Team Volume</p>
+                  </div>
+                  <p className="text-xl font-bold text-purple-400">${selectedUser.usdt_team_volume.toFixed(2)}</p>
                 </div>
               </div>
             </div>

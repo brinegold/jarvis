@@ -140,14 +140,25 @@ export default function AdminDashboard() {
 
       console.log('Main admin page - pending withdrawals:', pendingData) // Debug log
 
+      // Fetch emails separately using the admin API
+      let emailData: { emails?: Record<string, string> } = { emails: {} }
+      try {
+        const emailResponse = await fetch('/api/admin/get-user-emails')
+        if (emailResponse.ok) {
+          emailData = await emailResponse.json()
+        }
+      } catch (emailError) {
+        console.error('Error fetching user emails:', emailError)
+      }
+
       const formattedPending = pendingData?.map(w => ({
         id: w.id,
         user_id: w.user_id,
         amount: w.amount,
         wallet_address: w.wallet_address,
         created_at: w.created_at,
-        user_email: w.user_id, // Use user_id as fallback since email is in auth.users
-        username: w.profiles.username
+        user_email: emailData.emails?.[w.user_id] || w.user_id, // Use actual email or fallback to user_id
+        username: w.profiles.username || 'Unknown User'
       })) || []
 
       console.log('Main admin page - formatted pending:', formattedPending) // Debug log
@@ -426,6 +437,13 @@ export default function AdminDashboard() {
             className="jarvis-card px-6 py-3 rounded-lg text-white font-semibold hover:bg-white/10"
           >
             Investment Plans
+          </Link>
+          <Link 
+            href="/admin/wallet-collection"
+            className="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg text-white font-semibold flex items-center space-x-2"
+          >
+            <Wallet className="h-5 w-5" />
+            <span>Specific Wallet Collection</span>
           </Link>
           <button
             onClick={handleDistributeProfits}
