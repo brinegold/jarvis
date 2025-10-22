@@ -32,8 +32,11 @@ interface WithdrawalRequest {
 export default function WithdrawalsManagement() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(20)
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([])
   const [filteredWithdrawals, setFilteredWithdrawals] = useState<WithdrawalRequest[]>([])
+  const [paginatedWithdrawals, setPaginatedWithdrawals] = useState<WithdrawalRequest[]>([])
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -51,6 +54,13 @@ export default function WithdrawalsManagement() {
   useEffect(() => {
     filterWithdrawals()
   }, [withdrawals, statusFilter, searchTerm])
+
+  useEffect(() => {
+    // Calculate pagination
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    setPaginatedWithdrawals(filteredWithdrawals.slice(startIndex, endIndex))
+  }, [filteredWithdrawals, currentPage, itemsPerPage])
 
   const checkAdminAndFetch = async () => {
     try {
@@ -138,6 +148,7 @@ export default function WithdrawalsManagement() {
     }
 
     setFilteredWithdrawals(filtered)
+    setCurrentPage(1) // Reset to first page when filters change
   }
 
   const handleWithdrawalAction = async (withdrawalId: string, action: 'approve' | 'reject') => {
@@ -283,87 +294,144 @@ export default function WithdrawalsManagement() {
         {/* Withdrawals Table */}
         <div className="jarvis-card rounded-2xl p-6">
           <h2 className="text-xl font-bold text-white mb-6">Withdrawal Requests</h2>
-          
-          {filteredWithdrawals.length === 0 ? (
+
+          {paginatedWithdrawals.length === 0 ? (
             <div className="text-center py-8">
               <Eye className="h-16 w-16 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-300">No withdrawal requests found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <div className="space-y-4">
-                {filteredWithdrawals.map((withdrawal) => (
-                  <div key={withdrawal.id} className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-4">
-                            <div className="bg-blue-600/20 rounded-lg p-3 border border-blue-500/30">
-                              <div>
-                                <p className="text-white font-semibold text-lg">{withdrawal.username}</p>
-                                <p className="text-blue-300 text-sm font-medium">{withdrawal.user_email}</p>
-                                <p className="text-green-400 text-sm font-semibold">
-                                  Balance: ${withdrawal.main_wallet_balance.toFixed(2)}
-                                </p>
-                              </div>
+            <>
+              {paginatedWithdrawals.map((withdrawal) => (
+                <div key={withdrawal.id} className="bg-white/5 rounded-lg p-4 border border-white/10 mb-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-4">
+                          <div className="bg-blue-600/20 rounded-lg p-3 border border-blue-500/30">
+                            <div>
+                              <p className="text-white font-semibold text-lg">{withdrawal.username}</p>
+                              <p className="text-blue-300 text-sm font-medium">{withdrawal.user_email}</p>
+                              <p className="text-green-400 text-sm font-semibold">
+                                Balance: ${withdrawal.main_wallet_balance.toFixed(2)}
+                              </p>
                             </div>
                           </div>
-                          <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 ${getStatusColor(withdrawal.status)}`}>
-                            {getStatusIcon(withdrawal.status)}
-                            <span className="capitalize">{withdrawal.status}</span>
-                          </div>
                         </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <p className="text-gray-400">Withdrawal Amount</p>
-                            <p className="text-white font-semibold text-lg">${withdrawal.amount.toFixed(2)}</p>
-                            {withdrawal.amount > withdrawal.main_wallet_balance && (
-                              <p className="text-red-400 text-xs font-medium">⚠️ Exceeds balance</p>
-                            )}
-                            {withdrawal.amount <= withdrawal.main_wallet_balance && withdrawal.amount > withdrawal.main_wallet_balance * 0.8 && (
-                              <p className="text-yellow-400 text-xs font-medium">⚡ High amount</p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-gray-400">Destination Wallet</p>
-                            <p className="text-white font-mono text-xs break-all">{withdrawal.wallet_address}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400">Request Date</p>
-                            <p className="text-white">{new Date(withdrawal.created_at).toLocaleDateString()}</p>
-                            {withdrawal.processed_at && (
-                              <p className="text-gray-400 text-xs">
-                                Processed: {new Date(withdrawal.processed_at).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
+                        <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 ${getStatusColor(withdrawal.status)}`}>
+                          {getStatusIcon(withdrawal.status)}
+                          <span className="capitalize">{withdrawal.status}</span>
                         </div>
                       </div>
                       
-                      {withdrawal.status === 'pending' && (
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleWithdrawalAction(withdrawal.id, 'approve')}
-                            disabled={processingId === withdrawal.id}
-                            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            <span>Approve</span>
-                          </button>
-                          <button
-                            onClick={() => handleWithdrawalAction(withdrawal.id, 'reject')}
-                            disabled={processingId === withdrawal.id}
-                            className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            <span>Reject</span>
-                          </button>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-400">Withdrawal Amount</p>
+                          <p className="text-white font-semibold text-lg">${withdrawal.amount.toFixed(2)}</p>
+                          {withdrawal.amount > withdrawal.main_wallet_balance && (
+                            <p className="text-red-400 text-xs font-medium">⚠️ Exceeds balance</p>
+                          )}
+                          {withdrawal.amount <= withdrawal.main_wallet_balance && withdrawal.amount > withdrawal.main_wallet_balance * 0.8 && (
+                            <p className="text-yellow-400 text-xs font-medium">⚡ High amount</p>
+                          )}
                         </div>
-                      )}
+                        <div>
+                          <p className="text-gray-400">Destination Wallet</p>
+                          <p className="text-white font-mono text-xs break-all">{withdrawal.wallet_address}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Request Date</p>
+                          <p className="text-white">{new Date(withdrawal.created_at).toLocaleDateString()}</p>
+                          {withdrawal.processed_at && (
+                            <p className="text-gray-400 text-xs">
+                              Processed: {new Date(withdrawal.processed_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                    
+                    {withdrawal.status === 'pending' && (
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleWithdrawalAction(withdrawal.id, 'approve')}
+                          disabled={processingId === withdrawal.id}
+                          className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          onClick={() => handleWithdrawalAction(withdrawal.id, 'reject')}
+                          disabled={processingId === withdrawal.id}
+                          className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ))}
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Pagination Controls */}
+          {filteredWithdrawals.length > itemsPerPage && (
+            <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/20">
+              <div className="text-sm text-gray-400">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredWithdrawals.length)} of {filteredWithdrawals.length} withdrawals
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm font-medium text-white bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(7, Math.ceil(filteredWithdrawals.length / itemsPerPage)) }, (_, i) => {
+                    let pageNumber
+                    const totalPages = Math.ceil(filteredWithdrawals.length / itemsPerPage)
+
+                    if (totalPages <= 7) {
+                      pageNumber = i + 1
+                    } else if (currentPage <= 4) {
+                      pageNumber = i + 1
+                    } else if (currentPage >= totalPages - 3) {
+                      pageNumber = totalPages - 6 + i
+                    } else {
+                      pageNumber = currentPage - 3 + i
+                    }
+
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => setCurrentPage(pageNumber)}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                          currentPage === pageNumber
+                            ? 'bg-blue-600 text-white'
+                            : 'text-white bg-white/10 hover:bg-white/20'
+                        }`}
+                      >
+                        {pageNumber}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredWithdrawals.length / itemsPerPage), prev + 1))}
+                  disabled={currentPage === Math.ceil(filteredWithdrawals.length / itemsPerPage)}
+                  className="px-3 py-2 text-sm font-medium text-white bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
               </div>
             </div>
           )}
