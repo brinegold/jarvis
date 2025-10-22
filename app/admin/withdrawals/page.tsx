@@ -131,7 +131,9 @@ export default function WithdrawalsManagement() {
       filtered = filtered.filter(w => 
         w.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
         w.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        w.wallet_address.toLowerCase().includes(searchTerm.toLowerCase())
+        w.wallet_address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        w.amount.toString().includes(searchTerm) ||
+        w.main_wallet_balance.toString().includes(searchTerm)
       )
     }
 
@@ -294,10 +296,17 @@ export default function WithdrawalsManagement() {
                   <div key={withdrawal.id} className="bg-white/5 rounded-lg p-4 border border-white/10">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-4 mb-3">
-                          <div>
-                            <p className="text-white font-semibold">{withdrawal.username}</p>
-                            <p className="text-gray-400 text-sm">{withdrawal.user_email}</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-4">
+                            <div className="bg-blue-600/20 rounded-lg p-3 border border-blue-500/30">
+                              <div>
+                                <p className="text-white font-semibold text-lg">{withdrawal.username}</p>
+                                <p className="text-blue-300 text-sm font-medium">{withdrawal.user_email}</p>
+                                <p className="text-green-400 text-sm font-semibold">
+                                  Balance: ${withdrawal.main_wallet_balance.toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                           <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 ${getStatusColor(withdrawal.status)}`}>
                             {getStatusIcon(withdrawal.status)}
@@ -305,21 +314,23 @@ export default function WithdrawalsManagement() {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                           <div>
-                            <p className="text-gray-400">Amount</p>
-                            <p className="text-white font-semibold">${withdrawal.amount.toFixed(2)}</p>
+                            <p className="text-gray-400">Withdrawal Amount</p>
+                            <p className="text-white font-semibold text-lg">${withdrawal.amount.toFixed(2)}</p>
+                            {withdrawal.amount > withdrawal.main_wallet_balance && (
+                              <p className="text-red-400 text-xs font-medium">⚠️ Exceeds balance</p>
+                            )}
+                            {withdrawal.amount <= withdrawal.main_wallet_balance && withdrawal.amount > withdrawal.main_wallet_balance * 0.8 && (
+                              <p className="text-yellow-400 text-xs font-medium">⚡ High amount</p>
+                            )}
                           </div>
                           <div>
-                            <p className="text-gray-400">User Balance</p>
-                            <p className="text-white">${withdrawal.main_wallet_balance.toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400">Wallet Address</p>
+                            <p className="text-gray-400">Destination Wallet</p>
                             <p className="text-white font-mono text-xs break-all">{withdrawal.wallet_address}</p>
                           </div>
                           <div>
-                            <p className="text-gray-400">Requested</p>
+                            <p className="text-gray-400">Request Date</p>
                             <p className="text-white">{new Date(withdrawal.created_at).toLocaleDateString()}</p>
                             {withdrawal.processed_at && (
                               <p className="text-gray-400 text-xs">
