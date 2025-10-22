@@ -90,7 +90,7 @@ export default function WithdrawalsManagement() {
         .from('withdrawal_requests')
         .select(`
           *,
-          profiles!inner(username, main_wallet_balance)
+          profiles(username, main_wallet_balance)
         `)
         .order('created_at', { ascending: false })
 
@@ -119,8 +119,8 @@ export default function WithdrawalsManagement() {
         created_at: w.created_at,
         processed_at: w.processed_at,
         user_email: emailData.emails?.[w.user_id] || w.user_id, // Use actual email or fallback to user_id
-        username: w.profiles.username || 'Unknown User',
-        main_wallet_balance: w.profiles.main_wallet_balance
+        username: w.profiles?.username || 'Unknown User',
+        main_wallet_balance: w.profiles?.main_wallet_balance || 0
       })) || []
 
       console.log('Formatted withdrawals with emails:', formattedWithdrawals) // Debug log
