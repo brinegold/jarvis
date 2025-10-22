@@ -90,7 +90,7 @@ export default function WithdrawalsManagement() {
         .from('withdrawal_requests')
         .select(`
           *,
-          profiles(username, main_wallet_balance)
+          profiles(full_name, main_wallet_balance)
         `)
         .order('created_at', { ascending: false })
 
@@ -102,9 +102,25 @@ export default function WithdrawalsManagement() {
       // Fetch emails separately using the admin API
       let emailData: { emails?: Record<string, string> } = { emails: {} }
       try {
-        const emailResponse = await fetch('/api/admin/get-user-emails')
-        if (emailResponse.ok) {
-          emailData = await emailResponse.json()
+        // Get unique user IDs from withdrawal requests
+        const userIds = [...new Set(data?.map(w => w.user_id) || [])]
+
+        if (userIds.length > 0) {
+          const emailResponse = await fetch('/api/admin/get-user-emails', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userIds })
+          })
+
+          if (emailResponse.ok) {
+            const emailResult = await emailResponse.json()
+            emailData.emails = emailResult.users?.reduce((acc: Record<string, string>, user: any) => {
+              acc[user.id] = user.email
+              return acc
+            }, {}) || {}
+          }
         }
       } catch (emailError) {
         console.error('Error fetching user emails:', emailError)
@@ -119,7 +135,7 @@ export default function WithdrawalsManagement() {
         created_at: w.created_at,
         processed_at: w.processed_at,
         user_email: emailData.emails?.[w.user_id] || w.user_id, // Use actual email or fallback to user_id
-        username: w.profiles?.username || 'Unknown User',
+        username: w.profiles?.full_name || 'Unknown User',
         main_wallet_balance: w.profiles?.main_wallet_balance || 0
       })) || []
 
