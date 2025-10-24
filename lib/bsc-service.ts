@@ -396,6 +396,17 @@ class BSCService {
       const fromAccount = this.web3.eth.accounts.privateKeyToAccount(fromPrivateKey);
       const amountWei = this.web3.utils.toWei(amount, 'ether');
       
+      // Check balance before attempting transfer
+      const currentBalance = await this.getUSDTBalance(fromAccount.address);
+      const currentBalanceNum = parseFloat(currentBalance);
+      const transferAmountNum = parseFloat(amount);
+      
+      console.log(`Transfer validation - From: ${fromAccount.address}, Balance: ${currentBalanceNum} USDT, Transfer: ${transferAmountNum} USDT`);
+      
+      if (currentBalanceNum < transferAmountNum) {
+        throw new Error(`Insufficient USDT balance for transfer. Required: ${transferAmountNum}, Available: ${currentBalanceNum}, From: ${fromAccount.address}`);
+      }
+      
       const transferTx = this.usdtContract.methods.transfer(toAddress, amountWei);
       const gasEstimate = await transferTx.estimateGas({ from: fromAccount.address });
       const gasPrice = await this.web3.eth.getGasPrice();
@@ -413,10 +424,18 @@ class BSCService {
       const signedTx = await fromAccount.signTransaction(txData);
       const receipt = await this.web3.eth.sendSignedTransaction(signedTx.rawTransaction as string);
       
-      console.log(`USDT transfer successful: ${amount} USDT to ${toAddress}`);
+      console.log(`USDT transfer successful: ${amount} USDT from ${fromAccount.address} to ${toAddress}`);
       return receipt.transactionHash.toString();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error transferring USDT:', error);
+      
+      // Provide more specific error messages for common issues
+      if (error.message?.includes('transfer amount exceeds balance')) {
+        throw new Error(`BEP20 Transfer Failed: Insufficient USDT balance. ${error.message}`);
+      } else if (error.message?.includes('execution reverted')) {
+        throw new Error(`Smart Contract Error: ${error.message}`);
+      }
+      
       throw error;
     }
   }
@@ -763,25 +782,49 @@ class BSCService {
         }
       }
       
+      // Get current balance before transfers
+      let currentBalance = await this.getUSDTBalance(userWallet.address);
+      let currentBalanceNum = parseFloat(currentBalance);
+      console.log(`Current wallet balance before transfers: ${currentBalanceNum} USDT`);
+      
       // Transfer fee to ADMIN_FEE_WALLET if configured
       if (this.config.adminFeeWallet && feeAmount > 0) {
+        // Check if we have enough balance for the fee transfer
+        if (currentBalanceNum < feeAmount) {
+          throw new Error(`Insufficient USDT balance for fee transfer. Required: ${feeAmount}, Available: ${currentBalanceNum}`);
+        }
+        
         console.log(`Transferring fee ${feeAmount} USDT to admin fee wallet: ${this.config.adminFeeWallet}`);
         results.feeTransferTx = await this.transferUSDT(
           userPrivateKey,
           this.config.adminFeeWallet,
           feeAmount.toString()
         );
+        
+        // Update balance after fee transfer
+        currentBalanceNum -= feeAmount;
+        console.log(`Balance after fee transfer: ${currentBalanceNum} USDT`);
+        
+        // Wait a moment for the transaction to be confirmed before next transfer
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
       // Transfer remaining amount to GLOBAL_ADMIN_WALLET if configured
       const remainingAmount = depositAmount - feeAmount;
       if (this.config.globalAdminWallet && remainingAmount > 0) {
+        // Check if we have enough balance for the main transfer
+        if (currentBalanceNum < remainingAmount) {
+          throw new Error(`Insufficient USDT balance for main transfer. Required: ${remainingAmount}, Available: ${currentBalanceNum}`);
+        }
+        
         console.log(`Transferring remaining ${remainingAmount} USDT to global admin wallet: ${this.config.globalAdminWallet}`);
         results.mainTransferTx = await this.transferUSDT(
           userPrivateKey,
           this.config.globalAdminWallet,
           remainingAmount.toString()
         );
+        
+        console.log(`Main transfer completed successfully`);
       }
       
       // Recover BNB from user wallet after USDT transfers (if BNB was sent for gas)
