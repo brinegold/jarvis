@@ -217,20 +217,6 @@ export default function DepositRequestsPage() {
     setIsProcessing(true)
 
     try {
-      // Check if admin notes are empty for approval
-      if (modalAction === 'approve' && (!adminNotes || adminNotes.trim() === '')) {
-        alert('Admin notes are required when approving a deposit request. Please add a note explaining the approval decision.')
-        setIsProcessing(false)
-        return
-      }
-
-      // Check if admin notes are empty for rejection
-      if (modalAction === 'reject' && (!adminNotes || adminNotes.trim() === '')) {
-        alert('Admin notes are required when rejecting a deposit request. Please explain the reason for rejection.')
-        setIsProcessing(false)
-        return
-      }
-
       const endpoint = modalAction === 'approve'
         ? '/api/admin/deposit-requests/approve'
         : '/api/admin/deposit-requests/reject'
