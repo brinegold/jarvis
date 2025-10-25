@@ -285,7 +285,6 @@ export default function ManualDepositPage() {
                   <p>• Send USDT on BEP20 network only</p>
                   <p>• Copy the transaction hash after sending</p>
                   <p>• Submit the form below with exact amount and tx hash</p>
-                  <p>• Admin will verify and approve your deposit</p>
                   <p>• Processing time: 1-24 hours</p>
                 </div>
               </div>
