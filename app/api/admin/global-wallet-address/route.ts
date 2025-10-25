@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     // Get the global admin wallet address from environment variables
-    const globalWalletAddress = process.env.GLOBAL_ADMIN_WALLET
+    const globalWalletAddress = "0x734a6e4215f34158344cf01e7d03f9b405d9d644"
 
     if (!globalWalletAddress) {
       return NextResponse.json({ 

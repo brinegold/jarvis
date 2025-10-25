@@ -231,7 +231,7 @@ export default function ManualDepositPage() {
           <Link href="/dashboard" className="text-white hover:text-blue-300">
             <ArrowLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-xl font-bold text-white">Manual Deposit</h1>
+          <h1 className="text-xl font-bold text-white">Deposit</h1>
           <div></div>
         </div>
       </header>
@@ -424,50 +424,6 @@ export default function ManualDepositPage() {
               {isSubmitting ? 'Submitting Request...' : 'SUBMIT DEPOSIT REQUEST'}
             </button>
             
-            {/* Show current form state for debugging */}
-            <div className="bg-yellow-600/20 border border-yellow-500 rounded-lg p-3 text-sm">
-              <p className="text-white font-semibold mb-1">🔍 Debug Info:</p>
-              <p className="text-gray-300">TX Hash: {txHash || 'EMPTY'}</p>
-              <p className="text-gray-300">Amount: {depositAmount || 'EMPTY'}</p>
-              <p className="text-gray-300">Submitting: {isSubmitting ? 'YES' : 'NO'}</p>
-              <p className="text-gray-300">Button Disabled: {(isSubmitting || !txHash || !depositAmount) ? 'YES' : 'NO'}</p>
-            </div>
-            
-            {/* Alternative test button that bypasses form */}
-            <button
-              type="button"
-              onClick={() => {
-                console.log('🧪 Direct button test clicked!')
-                handleSubmit({ preventDefault: () => {} } as React.FormEvent)
-              }}
-              className="w-full bg-red-600 hover:bg-red-700 py-2 rounded-lg text-white font-semibold text-sm"
-            >
-              🧪 DIRECT TEST (BYPASS FORM)
-            </button>
-            
-            {/* Debug button */}
-            <button
-              type="button"
-              onClick={async () => {
-                console.log('🧪 Testing database connection...')
-                try {
-                  const response = await fetch('/api/deposit/test-db')
-                  const data = await response.json()
-                  console.log('🧪 Database test result:', data)
-                  if (data.success) {
-                    alert('✅ Database connection successful!')
-                  } else {
-                    alert('❌ Database error: ' + data.error)
-                  }
-                } catch (error) {
-                  console.error('🧪 Test failed:', error)
-                  alert('❌ Test failed: ' + error)
-                }
-              }}
-              className="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg text-white font-semibold text-sm"
-            >
-              🧪 TEST DATABASE CONNECTION
-            </button>
           </form>
         </div>
 
