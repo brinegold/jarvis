@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       .rpc('process_manual_deposit_approval', {
         p_request_id: requestId,
         p_admin_id: user.id,
-        p_admin_notes: adminNotes
+        p_admin_notes: adminNotes || null
       })
 
     if (processError) {

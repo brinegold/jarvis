@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       .rpc('reject_manual_deposit', {
         p_request_id: requestId,
         p_admin_id: user.id,
-        p_admin_notes: adminNotes.trim()
+        p_admin_notes: adminNotes.trim() || null
       })
 
     if (rejectError) {

@@ -3,6 +3,7 @@
 
 -- Drop existing functions first
 DROP FUNCTION IF EXISTS process_manual_deposit_approval(UUID, UUID, TEXT);
+DROP FUNCTION IF EXISTS reject_manual_deposit(UUID, UUID, TEXT);
 
 -- Recreate with correct column names and no referral function calls
 CREATE OR REPLACE FUNCTION process_manual_deposit_approval(

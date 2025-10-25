@@ -146,7 +146,7 @@ $$;
 CREATE OR REPLACE FUNCTION reject_manual_deposit(
   p_request_id UUID,
   p_admin_id UUID,
-  p_admin_notes TEXT
+  p_admin_notes TEXT DEFAULT NULL
 )
 RETURNS JSON
 LANGUAGE plpgsql
