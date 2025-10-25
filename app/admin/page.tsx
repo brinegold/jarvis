@@ -421,6 +421,13 @@ export default function AdminDashboard() {
             Manage Withdrawals
           </Link>
           <Link 
+            href="/admin/deposit-requests"
+            className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg text-white font-semibold flex items-center space-x-2"
+          >
+            <CreditCard className="h-5 w-5" />
+            <span>Deposit Requests</span>
+          </Link>
+          <Link 
             href="/admin/users"
             className="jarvis-card px-6 py-3 rounded-lg text-white font-semibold hover:bg-white/10"
           >
@@ -451,6 +458,30 @@ export default function AdminDashboard() {
           >
             Distribute Profits
           </button>
+        </div>
+
+        {/* Manual Deposit Information */}
+        <div className="jarvis-card rounded-2xl p-6 mb-8">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+            <CreditCard className="h-6 w-6" />
+            <span>Manual Deposit System</span>
+          </h2>
+          
+          <div className="bg-blue-600/20 border border-blue-500 rounded-lg p-4">
+            <h3 className="text-white font-semibold mb-2">System Update</h3>
+            <p className="text-gray-300 text-sm mb-3">
+              The platform now uses a manual deposit approval system. Users submit deposit requests 
+              which require admin verification and approval.
+            </p>
+            <div className="flex gap-4">
+              <Link 
+                href="/admin/deposit-requests"
+                className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-semibold text-sm"
+              >
+                Manage Deposit Requests
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Token Collection Section */}

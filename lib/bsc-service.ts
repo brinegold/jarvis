@@ -1,6 +1,7 @@
 import Web3 from 'web3';
 import { Contract } from 'web3-eth-contract';
 import crypto from 'crypto';
+import WalletSecurityValidator from './wallet-security-validator';
 
 interface BSCConfig {
   rpcUrl: string;
@@ -24,9 +25,14 @@ class BSCService {
   private readonly REQUEST_DELAY = 200; // 200ms between requests
   private balanceCache: Map<string, {balance: string, timestamp: number}> = new Map();
   private readonly CACHE_DURATION = 30000; // 30 seconds cache
+  private securityValidator: WalletSecurityValidator;
 
   constructor(config: BSCConfig) {
     this.config = config;
+    this.securityValidator = new WalletSecurityValidator();
+    
+    // CRITICAL: Validate wallet configuration before proceeding
+    this.validateConfigurationSecurity();
     
     // Multiple RPC providers for fallback
     this.rpcProviders = [
@@ -66,6 +72,62 @@ class BSCService {
     } catch (error) {
       console.error("Failed to connect to BSC network:", error);
     }
+  }
+
+  /**
+   * CRITICAL SECURITY: Validates wallet configuration to prevent funds being sent to random addresses
+   */
+  private validateConfigurationSecurity(): void {
+    console.log("🔒 SECURITY CHECK: Validating wallet configuration...");
+    
+    const validation = this.securityValidator.validateWalletConfig({
+      adminFeeWallet: this.config.adminFeeWallet,
+      globalAdminWallet: this.config.globalAdminWallet,
+      privateKey: this.config.privateKey,
+      walletSeed: process.env.WALLET_SEED
+    });
+
+    // Log validation results
+    if (validation.warnings.length > 0) {
+      console.warn("⚠️ SECURITY WARNINGS:");
+      validation.warnings.forEach(warning => console.warn(`  - ${warning}`));
+    }
+
+    if (validation.errors.length > 0) {
+      console.error("🚨 CRITICAL SECURITY ERRORS:");
+      validation.errors.forEach(error => console.error(`  - ${error}`));
+      throw new Error(
+        `SECURITY VALIDATION FAILED: Cannot initialize BSC Service with invalid wallet configuration. ` +
+        `Errors: ${validation.errors.join('; ')}. This prevents funds from being sent to random/invalid addresses.`
+      );
+    }
+
+    if (validation.safeDestination) {
+      console.log(`✅ SECURITY CHECK PASSED: Safe destination confirmed: ${validation.safeDestination}`);
+    } else {
+      throw new Error("SECURITY VALIDATION FAILED: No safe destination address found for transfers.");
+    }
+  }
+
+  /**
+   * Gets the validated safe destination address for transfers
+   */
+  private getSafeDestinationAddress(): string {
+    const safeDestination = this.securityValidator.getSafeDestination({
+      adminFeeWallet: this.config.adminFeeWallet,
+      globalAdminWallet: this.config.globalAdminWallet,
+      privateKey: this.config.privateKey,
+      walletSeed: process.env.WALLET_SEED
+    });
+
+    if (!safeDestination) {
+      throw new Error(
+        "SECURITY ERROR: No safe destination address available. " +
+        "This prevents funds from being sent to random or invalid addresses."
+      );
+    }
+
+    return safeDestination;
   }
 
   private initializeContracts() {
@@ -393,6 +455,27 @@ class BSCService {
   // Transfer USDT tokens
   async transferUSDT(fromPrivateKey: string, toAddress: string, amount: string): Promise<string> {
     try {
+      // CRITICAL SECURITY: Validate transfer before execution
+      const transferValidation = this.securityValidator.validateTransfer(
+        '', // fromAddress will be derived from private key
+        toAddress,
+        amount,
+        {
+          adminFeeWallet: this.config.adminFeeWallet,
+          globalAdminWallet: this.config.globalAdminWallet,
+          privateKey: this.config.privateKey,
+          walletSeed: process.env.WALLET_SEED
+        }
+      );
+
+      if (!transferValidation.isValid) {
+        const errorMsg = `SECURITY BLOCK: Transfer validation failed. Errors: ${transferValidation.errors.join('; ')}`;
+        console.error(`🚨 ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      console.log(`✅ SECURITY: Transfer validation passed for ${toAddress}`);
+
       const fromAccount = this.web3.eth.accounts.privateKeyToAccount(fromPrivateKey);
       const amountWei = this.web3.utils.toWei(amount, 'ether');
       
@@ -401,7 +484,7 @@ class BSCService {
       const currentBalanceNum = parseFloat(currentBalance);
       const transferAmountNum = parseFloat(amount);
       
-      console.log(`Transfer validation - From: ${fromAccount.address}, Balance: ${currentBalanceNum} USDT, Transfer: ${transferAmountNum} USDT`);
+      console.log(`Transfer validation - From: ${fromAccount.address}, Balance: ${currentBalanceNum} USDT, Transfer: ${transferAmountNum} USDT, To: ${toAddress}`);
       
       if (currentBalanceNum < transferAmountNum) {
         throw new Error(`Insufficient USDT balance for transfer. Required: ${transferAmountNum}, Available: ${currentBalanceNum}, From: ${fromAccount.address}`);
@@ -525,9 +608,11 @@ class BSCService {
             await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for confirmation
           }
           
+          // SECURITY: Use validated safe destination instead of fallback logic
+          const safeDestination = this.getSafeDestinationAddress();
           const txHash = await this.transferUSDT(
             wallet.privateKey,
-            this.config.globalAdminWallet || this.config.adminFeeWallet || '',
+            safeDestination,
             balanceResult.usdtBalance
           );
           
@@ -591,9 +676,11 @@ class BSCService {
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
       
+      // SECURITY: Use validated safe destination instead of fallback logic
+      const safeDestination = this.getSafeDestinationAddress();
       const txHash = await this.transferUSDT(
         privateKey,
-        this.config.globalAdminWallet || this.config.adminFeeWallet || '',
+        safeDestination,
         usdtBalance
       );
       
@@ -622,9 +709,11 @@ class BSCService {
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
       
+      // SECURITY: Use validated safe destination instead of fallback logic
+      const safeDestination = this.getSafeDestinationAddress();
       const txHash = await this.transferUSDT(
         userWallet.privateKey,
-        this.config.globalAdminWallet || this.config.adminFeeWallet || '',
+        safeDestination,
         usdtBalance
       );
       
