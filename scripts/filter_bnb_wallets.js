@@ -13,34 +13,17 @@ const BSC_RPC_URLS = [
 
 let currentRpcIndex = 0;
 
-// USDT token contract address on BSC
-const USDT_CONTRACT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
-
-// ERC20 balanceOf function signature
-const BALANCE_OF_SIGNATURE = '0x70a08231';
-
 /**
- * Check USDT balance for a single wallet address using RPC
+ * Check BNB balance for a single wallet address using RPC
  */
-async function checkUSDTBalance(address) {
+async function checkBNBBalance(address) {
   try {
     const rpcUrl = BSC_RPC_URLS[currentRpcIndex];
     
-    // Encode the balanceOf call data
-    // balanceOf(address) = 0x70a08231 + padded address (remove 0x and pad to 32 bytes)
-    const paddedAddress = address.slice(2).padStart(64, '0');
-    const data = BALANCE_OF_SIGNATURE + paddedAddress;
-    
     const response = await axios.post(rpcUrl, {
       jsonrpc: '2.0',
-      method: 'eth_call',
-      params: [
-        {
-          to: USDT_CONTRACT_ADDRESS,
-          data: data
-        },
-        'latest'
-      ],
+      method: 'eth_getBalance',
+      params: [address, 'latest'],
       id: 1
     }, {
       headers: {
@@ -51,16 +34,16 @@ async function checkUSDTBalance(address) {
     if (response.data.result) {
       // Convert hex balance to decimal
       const balance = parseInt(response.data.result, 16);
-      // USDT has 18 decimals, so divide by 10^18 to get actual balance
+      // BNB has 18 decimals, so divide by 10^18 to get actual balance
       const actualBalance = balance / Math.pow(10, 18);
       
       // Debug logging
-      console.log(`   Raw balance: ${response.data.result} (${balance}), Actual: ${actualBalance.toFixed(6)} USDT`);
+      console.log(`   Raw balance: ${response.data.result} (${balance}), Actual: ${actualBalance.toFixed(6)} BNB`);
       
       return {
         address,
         balance: actualBalance,
-        hasUSDT: actualBalance > 0
+        hasBNB: actualBalance > 0
       };
     } else if (response.data.error) {
       console.error(`RPC Error for ${address}:`, response.data.error.message);
@@ -71,7 +54,7 @@ async function checkUSDTBalance(address) {
       return {
         address,
         balance: 0,
-        hasUSDT: false,
+        hasBNB: false,
         error: response.data.error.message
       };
     } else {
@@ -79,7 +62,7 @@ async function checkUSDTBalance(address) {
       return {
         address,
         balance: 0,
-        hasUSDT: false,
+        hasBNB: false,
         error: 'Unexpected response format'
       };
     }
@@ -88,20 +71,20 @@ async function checkUSDTBalance(address) {
     return {
       address,
       balance: 0,
-      hasUSDT: false,
+      hasBNB: false,
       error: error.message
     };
   }
 }
 
 /**
- * Process wallet addresses and filter those with USDT
+ * Process wallet addresses and filter those with BNB
  */
-async function filterWalletsWithUSDT(wallets) {
-  console.log(`🔍 Checking ${wallets.length} wallet addresses for USDT...`);
+async function filterWalletsWithBNB(wallets) {
+  console.log(`🔍 Checking ${wallets.length} wallet addresses for BNB...`);
 
   const results = [];
-  const addressesWithUSDT = [];
+  const addressesWithBNB = [];
 
   // Add delay between requests to avoid rate limiting
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -120,7 +103,7 @@ async function filterWalletsWithUSDT(wallets) {
       results.push({
         address,
         balance: 0,
-        hasUSDT: false,
+        hasBNB: false,
         error: 'Invalid address format'
       });
       continue;
@@ -128,12 +111,12 @@ async function filterWalletsWithUSDT(wallets) {
 
     console.log(`📊 Checking ${i + 1}/${wallets.length}: ${address}`);
 
-    const result = await checkUSDTBalance(address);
+    const result = await checkBNBBalance(address);
     results.push(result);
 
-    if (result.hasUSDT) {
-      addressesWithUSDT.push(address);
-      console.log(`✅ Found USDT: ${address} (${result.balance} USDT)`);
+    if (result.hasBNB) {
+      addressesWithBNB.push(address);
+      console.log(`✅ Found BNB: ${address} (${result.balance.toFixed(6)} BNB)`);
     }
 
     // Add delay to avoid rate limiting (BSCScan allows 5 calls/second)
@@ -144,9 +127,9 @@ async function filterWalletsWithUSDT(wallets) {
 
   return {
     totalChecked: wallets.length,
-    withUSDT: addressesWithUSDT.length,
-    withoutUSDT: wallets.length - addressesWithUSDT.length,
-    addressesWithUSDT,
+    withBNB: addressesWithBNB.length,
+    withoutBNB: wallets.length - addressesWithBNB.length,
+    addressesWithBNB,
     detailedResults: results
   };
 }
@@ -196,39 +179,45 @@ async function main() {
       process.exit(1);
     }
 
-    console.log(`\n🚀 Starting USDT balance check for ${addresses.length} addresses...\n`);
+    console.log(`\n🚀 Starting BNB balance check for ${addresses.length} addresses...\n`);
 
     // Process the addresses
-    const result = await filterWalletsWithUSDT(addresses);
+    const result = await filterWalletsWithBNB(addresses);
 
     // Output results
     console.log('\n📋 RESULTS SUMMARY:');
     console.log(`Total addresses checked: ${result.totalChecked}`);
-    console.log(`Addresses with USDT: ${result.withUSDT}`);
-    console.log(`Addresses without USDT: ${result.withoutUSDT}`);
+    console.log(`Addresses with BNB: ${result.withBNB}`);
+    console.log(`Addresses without BNB: ${result.withoutBNB}`);
 
-    console.log('\n💰 ADDRESSES WITH USDT:');
-    if (result.addressesWithUSDT.length > 0) {
-      result.addressesWithUSDT.forEach((address, index) => {
-        console.log(`${index + 1}. ${address}`);
+    console.log('\n💰 ADDRESSES WITH BNB:');
+    if (result.addressesWithBNB.length > 0) {
+      result.addressesWithBNB.forEach((address, index) => {
+        const details = result.detailedResults.find(r => r.address === address);
+        console.log(`${index + 1}. ${address} - ${details.balance.toFixed(6)} BNB`);
       });
     } else {
-      console.log('No addresses found with USDT balance');
+      console.log('No addresses found with BNB balance');
     }
 
+    // Calculate total BNB
+    const totalBNB = result.detailedResults.reduce((sum, r) => sum + r.balance, 0);
+    console.log(`\n💎 Total BNB across all wallets: ${totalBNB.toFixed(6)} BNB`);
+
     // Save detailed results to file
-    const outputFileName = `usdt_check_result_${Date.now()}.json`;
+    const outputFileName = `bnb_check_result_${Date.now()}.json`;
     fs.writeFileSync(outputFileName, JSON.stringify(result, null, 2));
     console.log(`\n💾 Detailed results saved to: ${outputFileName}`);
 
     // Output JSON for programmatic use
     console.log('\n📄 JSON OUTPUT:');
     console.log(JSON.stringify({
-      addressesWithUSDT: result.addressesWithUSDT,
+      addressesWithBNB: result.addressesWithBNB,
       summary: {
         totalChecked: result.totalChecked,
-        withUSDT: result.withUSDT,
-        withoutUSDT: result.withoutUSDT
+        withBNB: result.withBNB,
+        withoutBNB: result.withoutBNB,
+        totalBNB: totalBNB
       }
     }, null, 2));
 
@@ -244,6 +233,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  checkUSDTBalance,
-  filterWalletsWithUSDT
+  checkBNBBalance,
+  filterWalletsWithBNB
 };

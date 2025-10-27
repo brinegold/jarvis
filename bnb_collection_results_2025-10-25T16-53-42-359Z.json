@@ -1,0 +1,52 @@
+{
+  "totalWallets": 6,
+  "successfulCollections": 0,
+  "failedCollections": 6,
+  "totalBNBCollected": 0,
+  "results": [
+    {
+      "userId": "9897c0f7-97df-41e8-8a05-524e24e1c9c2",
+      "walletAddress": "0x8Fb7a5836f796Cc8B2aDe74686a8780b70a08945",
+      "success": false,
+      "error": "Insufficient balance (minimum 0.005 BNB required)",
+      "timestamp": "2025-10-25T16:53:26.195Z"
+    },
+    {
+      "userId": "eef1a77e-1b72-4b16-96fb-b3e020636227",
+      "walletAddress": "0x78830EfDa881718E687eeB0929c69067924148a8",
+      "success": false,
+      "error": "Insufficient balance (minimum 0.005 BNB required)",
+      "timestamp": "2025-10-25T16:53:29.398Z"
+    },
+    {
+      "userId": "3726c5ca-1d77-465b-addd-cc7f4c709f73",
+      "walletAddress": "0x4fbE8ff3c0e81dd4554CC0eDacC288Cd75ba164d",
+      "success": false,
+      "error": "Insufficient balance (minimum 0.005 BNB required)",
+      "timestamp": "2025-10-25T16:53:32.592Z"
+    },
+    {
+      "userId": "8875c552-f09b-4f38-b2ea-cec84b071ffc",
+      "walletAddress": "0x75160cbE4D27E01308AdE5007892B83C59E64B89",
+      "success": false,
+      "error": "Insufficient balance (minimum 0.005 BNB required)",
+      "timestamp": "2025-10-25T16:53:35.793Z"
+    },
+    {
+      "userId": "91c1e123-f1d0-4791-bbdc-4f6232fb7402",
+      "walletAddress": "0xcd9E8fa403fcC325a6955d79429ba15bf54E06b6",
+      "success": false,
+      "error": "Insufficient balance (minimum 0.005 BNB required)",
+      "timestamp": "2025-10-25T16:53:38.979Z"
+    },
+    {
+      "userId": "140b6cbc-9df3-40ca-9504-d6030e2ff8ef",
+      "walletAddress": "0x9382b680e9CDfAEc38e1d974657Df276399dED71",
+      "success": false,
+      "error": "Insufficient balance (minimum 0.005 BNB required)",
+      "timestamp": "2025-10-25T16:53:42.166Z"
+    }
+  ],
+  "startTime": "2025-10-25T16:53:25.613Z",
+  "endTime": "2025-10-25T16:53:42.354Z"
+}

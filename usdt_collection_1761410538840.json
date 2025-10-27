@@ -1,0 +1,42 @@
+{
+  "totalWallets": 4,
+  "successfulCollections": 4,
+  "failedCollections": 0,
+  "totalUSDTCollected": 23.907625389600003,
+  "results": [
+    {
+      "userId": "9897c0f7-97df-41e8-8a05-524e24e1c9c2",
+      "walletAddress": "0x8Fb7a5836f796Cc8B2aDe74686a8780b70a08945",
+      "success": true,
+      "txHash": "0xc9efa74866891d727723716d2db06e321689ffbcdf14b0c2ff47d74defe9a52f",
+      "amount": "12.21062538959999999",
+      "timestamp": "2025-10-25T16:41:43.856Z"
+    },
+    {
+      "userId": "eef1a77e-1b72-4b16-96fb-b3e020636227",
+      "walletAddress": "0x78830EfDa881718E687eeB0929c69067924148a8",
+      "success": true,
+      "txHash": "0xdea3158c1c928021e5525bbbcc03dd619c57ff8c5279df733ce679eb62acfce9",
+      "amount": "10.19699999999999999",
+      "timestamp": "2025-10-25T16:41:50.457Z"
+    },
+    {
+      "userId": "e83ce4d8-398e-460f-9322-e8e515e61a3d",
+      "walletAddress": "0x63d9aE5cfe0bEe16fdb72CDbd34fb695D1313316",
+      "success": true,
+      "txHash": "0x221aa366f3269c6b3dc0a0f17ae79dcf2e782282aa9ddac65c25df6c473e10e7",
+      "amount": "1.10000000000000202",
+      "timestamp": "2025-10-25T16:41:56.891Z"
+    },
+    {
+      "userId": "6f2f9cce-2762-4390-8bf2-972db0d9e637",
+      "walletAddress": "0xE64b82F8579874e6fC884BFD367545cCCf55588C",
+      "success": true,
+      "txHash": "0x72f41ec1ce33b79278520ee57bc209ba98e21a0d13ce36345ebf14eb2d59b17c",
+      "amount": "0.40000000000000101",
+      "timestamp": "2025-10-25T16:42:09.847Z"
+    }
+  ],
+  "startTime": "2025-10-25T16:41:43.336Z",
+  "endTime": "2025-10-25T16:42:18.835Z"
+}

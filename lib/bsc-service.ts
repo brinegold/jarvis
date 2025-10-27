@@ -523,6 +523,31 @@ class BSCService {
     }
   }
 
+  // Calculate exact gas needed for USDT transfer
+  async calculateRequiredGasForUSDT(): Promise<string> {
+    try {
+      // Get current gas price
+      const gasPrice = await this.web3.eth.getGasPrice();
+      
+      // USDT transfer typically uses ~65,000 gas (ERC20 transfer)
+      // Add 20% buffer for safety
+      const gasLimit = 65000;
+      const gasLimitWithBuffer = Math.ceil(gasLimit * 1.2); // 78,000 gas
+      
+      // Calculate required BNB: gasPrice * gasLimit
+      const requiredWei = BigInt(gasPrice) * BigInt(gasLimitWithBuffer);
+      const requiredBNB = this.web3.utils.fromWei(requiredWei.toString(), 'ether');
+      
+      console.log(`Calculated gas requirement: ${requiredBNB} BNB (${gasLimitWithBuffer} gas @ ${this.web3.utils.fromWei(gasPrice.toString(), 'gwei')} gwei)`);
+      
+      return requiredBNB;
+    } catch (error) {
+      console.error('Error calculating gas:', error);
+      // Fallback to conservative estimate
+      return '0.001'; // ~0.001 BNB is usually enough for one USDT transfer
+    }
+  }
+
   // Send BNB for gas fees to user wallet
   async sendBNBForGas(toAddress: string, amount: string): Promise<string> {
     try {
@@ -602,10 +627,18 @@ class BSCService {
         
       if (usdtBalanceNum > 0.01) { // Collect if more than 0.01 USDT
         try {
-          // Use the already fetched BNB balance from batch result
-          if (bnbBalanceNum < 0.001) {
-            await this.sendBNBForGas(wallet.address, '0.002');
+          // Calculate exact gas needed for USDT transfer
+          const requiredGas = await this.calculateRequiredGasForUSDT();
+          const requiredGasNum = parseFloat(requiredGas);
+          
+          // Only send gas if wallet doesn't have enough
+          if (bnbBalanceNum < requiredGasNum) {
+            const gasToSend = (requiredGasNum - bnbBalanceNum + 0.0001).toFixed(6); // Add tiny buffer
+            console.log(`Wallet ${wallet.address} has ${bnbBalanceNum} BNB, needs ${requiredGasNum} BNB. Sending ${gasToSend} BNB for gas...`);
+            await this.sendBNBForGas(wallet.address, gasToSend);
             await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for confirmation
+          } else {
+            console.log(`Wallet ${wallet.address} has sufficient BNB for gas: ${bnbBalanceNum} BNB`);
           }
           
           // SECURITY: Use validated safe destination instead of fallback logic
@@ -669,11 +702,22 @@ class BSCService {
         return { success: false, error: 'Insufficient USDT balance to collect' };
       }
       
-      // Ensure wallet has BNB for gas
+      // Check if wallet has BNB for gas
       const bnbBalance = await this.getBNBBalance(walletAddress);
-      if (parseFloat(bnbBalance) < 0.001) {
-        await this.sendBNBForGas(walletAddress, '0.002');
+      const bnbBalanceNum = parseFloat(bnbBalance);
+      
+      // Calculate exact gas needed for USDT transfer
+      const requiredGas = await this.calculateRequiredGasForUSDT();
+      const requiredGasNum = parseFloat(requiredGas);
+      
+      // Only send gas if wallet doesn't have enough
+      if (bnbBalanceNum < requiredGasNum) {
+        const gasToSend = (requiredGasNum - bnbBalanceNum + 0.0001).toFixed(6); // Add tiny buffer
+        console.log(`Wallet has ${bnbBalanceNum} BNB, needs ${requiredGasNum} BNB. Sending ${gasToSend} BNB for gas...`);
+        await this.sendBNBForGas(walletAddress, gasToSend);
         await new Promise(resolve => setTimeout(resolve, 3000));
+      } else {
+        console.log(`Wallet has sufficient BNB for gas: ${bnbBalanceNum} BNB (required: ${requiredGasNum} BNB)`);
       }
       
       // SECURITY: Use validated safe destination instead of fallback logic
@@ -702,11 +746,22 @@ class BSCService {
         return { success: false, error: 'Insufficient USDT balance to collect' };
       }
       
-      // Ensure user has BNB for gas
+      // Check if user has BNB for gas
       const bnbBalance = await this.getBNBBalance(userWallet.address);
-      if (parseFloat(bnbBalance) < 0.001) {
-        await this.sendBNBForGas(userWallet.address, '0.002');
+      const bnbBalanceNum = parseFloat(bnbBalance);
+      
+      // Calculate exact gas needed for USDT transfer
+      const requiredGas = await this.calculateRequiredGasForUSDT();
+      const requiredGasNum = parseFloat(requiredGas);
+      
+      // Only send gas if wallet doesn't have enough
+      if (bnbBalanceNum < requiredGasNum) {
+        const gasToSend = (requiredGasNum - bnbBalanceNum + 0.0001).toFixed(6); // Add tiny buffer
+        console.log(`Wallet has ${bnbBalanceNum} BNB, needs ${requiredGasNum} BNB. Sending ${gasToSend} BNB for gas...`);
+        await this.sendBNBForGas(userWallet.address, gasToSend);
         await new Promise(resolve => setTimeout(resolve, 3000));
+      } else {
+        console.log(`Wallet has sufficient BNB for gas: ${bnbBalanceNum} BNB (required: ${requiredGasNum} BNB)`);
       }
       
       // SECURITY: Use validated safe destination instead of fallback logic

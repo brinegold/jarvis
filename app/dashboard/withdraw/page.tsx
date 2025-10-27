@@ -11,6 +11,13 @@ interface Profile {
   main_wallet_balance: number
 }
 
+interface PendingWithdrawal {
+  id: string
+  amount: number
+  status: string
+  created_at: string
+}
+
 export default function WithdrawPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -20,6 +27,7 @@ export default function WithdrawPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<PendingWithdrawal | null>(null)
   const supabase = createSupabaseClient()
 
   useEffect(() => {
@@ -31,6 +39,7 @@ export default function WithdrawPage() {
   useEffect(() => {
     if (user) {
       fetchProfile()
+      checkPendingWithdrawal()
     }
   }, [user])
 
@@ -49,11 +58,41 @@ export default function WithdrawPage() {
     }
   }
 
+  const checkPendingWithdrawal = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, amount, status, created_at')
+        .eq('user_id', user?.id)
+        .eq('transaction_type', 'withdrawal')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (data) {
+        setPendingWithdrawal(data)
+      } else {
+        setPendingWithdrawal(null)
+      }
+    } catch (error) {
+      // No pending withdrawal found
+      setPendingWithdrawal(null)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     setError('')
     setSuccess('')
+
+    // Check for pending withdrawal
+    if (pendingWithdrawal) {
+      setError('You already have a pending withdrawal request. Please wait for it to be processed.')
+      setIsSubmitting(false)
+      return
+    }
 
     const withdrawAmount = parseFloat(amount)
     
@@ -97,6 +136,9 @@ export default function WithdrawPage() {
         
         // Update local profile state
         setProfile(prev => prev ? { ...prev, main_wallet_balance: prev.main_wallet_balance - withdrawAmount } : null)
+        
+        // Refresh pending withdrawal status
+        await checkPendingWithdrawal()
       } else {
         setError(data.error || 'Failed to submit withdrawal request')
       }
@@ -136,6 +178,25 @@ export default function WithdrawPage() {
           <p className="text-3xl font-bold text-green-400">${profile?.main_wallet_balance.toFixed(2) || '0.00'}</p>
           <p className="text-gray-300 text-sm mt-2">Amount in USD</p>
         </div>
+
+        {pendingWithdrawal && (
+          <div className="bg-orange-500/20 border border-orange-500 text-orange-200 px-4 py-3 rounded-lg mb-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-orange-200">Pending Withdrawal</h3>
+                <p className="mt-1 text-sm text-orange-300">
+                  You have a pending withdrawal of <span className="font-bold">${pendingWithdrawal.amount.toFixed(2)}</span> awaiting admin approval. 
+                  You cannot submit a new withdrawal request until this one is processed.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-4">
@@ -212,10 +273,10 @@ export default function WithdrawPage() {
 
             <button
               type="submit"
-              disabled={isSubmitting || !amount || !walletAddress}
+              disabled={isSubmitting || !amount || !walletAddress || !!pendingWithdrawal}
               className="w-full jarvis-button py-4 rounded-lg text-white font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Processing...' : 'SUBMIT'}
+              {pendingWithdrawal ? 'PENDING WITHDRAWAL IN PROGRESS' : (isSubmitting ? 'Processing...' : 'SUBMIT')}
             </button>
           </form>
         </div>
@@ -239,6 +300,7 @@ export default function WithdrawPage() {
               <li>• Minimum withdrawal: $10.00</li>
               <li>• Withdrawal fee: 10% of withdrawal amount</li>
               <li>• Processing time: 24-48 hours</li>
+              <li>• Only 1 pending withdrawal allowed at a time</li>
               <li>• Only profits can be withdrawn</li>
               <li>• Principal amount cannot be withdrawn</li>
             </ul>

@@ -41,16 +41,10 @@ export default function ReferralPage() {
   const supabase = createSupabaseClient()
 
   const referralLevels = [
-    { level: 1, percentage: 15 },
-    { level: 2, percentage: 10 },
-    { level: 3, percentage: 5 },
-    { level: 4, percentage: 3 },
-    { level: 5, percentage: 2 },
-    { level: 6, percentage: 1 },
-    { level: 7, percentage: 0.5 },
-    { level: 8, percentage: 0.2 },
-    { level: 9, percentage: 0.1 },
-    { level: 10, percentage: 0.05 }
+    { level: 1, percentage: 5 },
+    { level: 2, percentage: 3 },
+    { level: 3, percentage: 2 },
+    { level: 4, percentage: 1 }
   ]
 
   useEffect(() => {
@@ -310,7 +304,7 @@ export default function ReferralPage() {
         <div className="jarvis-card rounded-2xl p-6 mb-6">
           <h3 className="text-white font-bold text-lg mb-4">Dual Commission Structure</h3>
           <div className="space-y-3">
-            {/* Always show all 10 levels with actual data when available */}
+            {/* Always show all 4 levels with actual data when available */}
             {referralLevels.map((level) => {
               // Find matching level stat if it exists
               const levelStat = stats?.level_stats?.find(ls => ls.level === level.level)
@@ -381,7 +375,7 @@ export default function ReferralPage() {
           <div className="grid grid-cols-2 gap-4 text-center">
             <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg p-4">
               <Users className="h-8 w-8 text-green-400 mx-auto mb-2" />
-              <p className="text-white font-semibold">10 Levels</p>
+              <p className="text-white font-semibold">4 Levels</p>
               <p className="text-gray-300 text-sm">Deep Commission</p>
             </div>
             <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg p-4">
@@ -392,7 +386,7 @@ export default function ReferralPage() {
           </div>
           <div className="mt-4 p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg border border-yellow-500/30">
             <p className="text-center text-yellow-400 font-semibold text-sm">
-              🎉 Earn up to 15% USDT + 20% JRC coins on Level 1 referrals!
+              🎉 Earn up to 5% USDT + 20% JRC coins on Level 1 referrals!
             </p>
           </div>
         </div>

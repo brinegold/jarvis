@@ -1,7 +1,30 @@
--- Optimized referral system functions for better performance
--- These functions reduce the number of database queries and improve loading times
+-- Migration script to update referral structure from 10 levels to 4 levels
+-- Run this in Supabase SQL Editor
 
--- Function to get referral chain recursively in a single query
+-- Step 1: Check existing data distribution
+SELECT 
+    level,
+    COUNT(*) as count
+FROM referrals
+GROUP BY level
+ORDER BY level;
+
+-- Step 2: Handle existing referral records with levels > 4
+-- Option A: Delete old referral relationships (recommended for clean migration)
+DELETE FROM referrals WHERE level > 4;
+
+-- Option B: If you want to keep them, cap at level 4 (uncomment below and comment out DELETE above)
+-- UPDATE referrals SET level = 4 WHERE level > 4;
+
+-- Step 3: Update the referrals table constraint to allow only 4 levels
+ALTER TABLE public.referrals 
+DROP CONSTRAINT IF EXISTS referrals_level_check;
+
+ALTER TABLE public.referrals 
+ADD CONSTRAINT referrals_level_check 
+CHECK (level >= 1 AND level <= 4);
+
+-- Step 2: Update the optimized referral functions with new 4-level structure
 CREATE OR REPLACE FUNCTION get_referral_chain_recursive(
     start_user_id UUID,
     max_levels INTEGER DEFAULT 4
@@ -58,7 +81,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to get referral statistics efficiently
+-- Step 3: Update the optimized stats function with new commission rates
 CREATE OR REPLACE FUNCTION get_referral_stats_optimized(
     user_id UUID
 )
@@ -103,7 +126,7 @@ BEGIN
         WHERE sponsor_id = user_referral_code
     ) direct_count
     CROSS JOIN (
-        -- Level statistics
+        -- Level statistics with new 4-level rates
         SELECT json_agg(
             json_build_object(
                 'level', level_data.level,
@@ -135,41 +158,46 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to get direct referrals efficiently
-CREATE OR REPLACE FUNCTION get_direct_referrals_count(
-    user_id UUID
-)
-RETURNS INTEGER AS $$
-DECLARE
-    user_referral_code TEXT;
-    referral_count INTEGER;
-BEGIN
-    -- Get user's referral code
-    SELECT referral_code INTO user_referral_code
-    FROM profiles
-    WHERE id = user_id;
-    
-    IF user_referral_code IS NULL THEN
-        RETURN 0;
-    END IF;
-    
-    -- Count direct referrals
-    SELECT COUNT(*) INTO referral_count
-    FROM profiles
-    WHERE sponsor_id = user_referral_code;
-    
-    RETURN COALESCE(referral_count, 0);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Grant execute permissions
+-- Step 4: Grant permissions
 GRANT EXECUTE ON FUNCTION get_referral_chain_recursive TO authenticated;
 GRANT EXECUTE ON FUNCTION get_referral_stats_optimized TO authenticated;
-GRANT EXECUTE ON FUNCTION get_direct_referrals_count TO authenticated;
 
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_profiles_sponsor_id ON profiles(sponsor_id);
-CREATE INDEX IF NOT EXISTS idx_referral_commissions_referrer_level ON referral_commissions(referrer_id, level);
-CREATE INDEX IF NOT EXISTS idx_referral_commissions_referred_id ON referral_commissions(referred_id);
+-- Step 5: Check existing commission data distribution
+SELECT 
+    level,
+    COUNT(*) as commission_count,
+    SUM(COALESCE(usdt_commission, commission_amount, 0)) as total_usdt,
+    SUM(COALESCE(jrc_commission, 0)) as total_jrc
+FROM referral_commissions
+WHERE level > 4
+GROUP BY level
+ORDER BY level;
 
-SELECT 'Referral optimization functions created successfully!' as status;
+-- Step 6: Handle old commission records (levels 5-10)
+-- These commissions have already been paid, so we keep them for historical records
+-- But you can optionally archive or delete them
+
+-- Option A: Archive old commissions (keeps data, marks as archived)
+-- UPDATE referral_commissions 
+-- SET transaction_type = 'archived_' || transaction_type
+-- WHERE level > 4 AND transaction_type NOT LIKE 'archived_%';
+
+-- Option B: Delete old commission records (clean slate)
+-- WARNING: This permanently deletes historical commission data
+-- DELETE FROM referral_commissions WHERE level > 4;
+
+-- Step 7: Verify the changes
+SELECT 
+    'Migration completed successfully!' as status,
+    'Referral structure updated to 4 levels' as message,
+    'New USDT rates: Level 1=5%, Level 2=3%, Level 3=2%, Level 4=1%' as commission_rates;
+
+-- Step 8: Check existing data
+SELECT 
+    level,
+    COUNT(*) as commission_count,
+    SUM(COALESCE(usdt_commission, commission_amount, 0)) as total_usdt,
+    SUM(COALESCE(jrc_commission, 0)) as total_jrc
+FROM referral_commissions
+GROUP BY level
+ORDER BY level;

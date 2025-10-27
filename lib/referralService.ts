@@ -17,18 +17,12 @@ export interface ReferralTransaction {
 export class DualReferralService {
   private supabase = createSupabaseClient()
   
-  // 10-level referral commission structure
+  // 4-level referral commission structure for USDT staking
   private readonly commissionRates: ReferralCommissionRates[] = [
-    { level: 1, usdtRate: 15, jrcRate: 20 },   // Level 1: 15% USDT, 20% JRC
-    { level: 2, usdtRate: 10, jrcRate: 15 },   // Level 2: 10% USDT, 15% JRC
-    { level: 3, usdtRate: 5, jrcRate: 10 },    // Level 3: 5% USDT, 10% JRC
-    { level: 4, usdtRate: 3, jrcRate: 8 },     // Level 4: 3% USDT, 8% JRC
-    { level: 5, usdtRate: 2, jrcRate: 6 },     // Level 5: 2% USDT, 6% JRC
-    { level: 6, usdtRate: 1, jrcRate: 4 },     // Level 6: 1% USDT, 4% JRC
-    { level: 7, usdtRate: 0.5, jrcRate: 3 },   // Level 7: 0.5% USDT, 3% JRC
-    { level: 8, usdtRate: 0.2, jrcRate: 2 },   // Level 8: 0.2% USDT, 2% JRC
-    { level: 9, usdtRate: 0.1, jrcRate: 1.5 }, // Level 9: 0.1% USDT, 1.5% JRC
-    { level: 10, usdtRate: 0.05, jrcRate: 1 }  // Level 10: 0.05% USDT, 1% JRC
+    { level: 1, usdtRate: 5, jrcRate: 20 },   // Level 1: 5% USDT, 20% JRC
+    { level: 2, usdtRate: 3, jrcRate: 15 },   // Level 2: 3% USDT, 15% JRC
+    { level: 3, usdtRate: 2, jrcRate: 10 },   // Level 3: 2% USDT, 10% JRC
+    { level: 4, usdtRate: 1, jrcRate: 8 }     // Level 4: 1% USDT, 8% JRC
   ]
 
   /**
@@ -68,13 +62,13 @@ export class DualReferralService {
   }
 
   /**
-   * Get the referral chain for a user (up to 10 levels)
+   * Get the referral chain for a user (up to 4 levels)
    */
   private async getReferralChain(userId: string): Promise<any[]> {
     const chain: any[] = []
     let currentUserId = userId
     
-    for (let level = 1; level <= 10; level++) {
+    for (let level = 1; level <= 4; level++) {
       // Find who referred this user (using sponsor_id which contains the referrer's referral_code)
       const { data: referralData, error } = await this.supabase
         .from('profiles')

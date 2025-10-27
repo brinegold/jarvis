@@ -1,0 +1,38 @@
+{
+  "totalWallets": 4,
+  "successfulCollections": 0,
+  "failedCollections": 4,
+  "totalUSDTCollected": 0,
+  "results": [
+    {
+      "userId": "0x8Fb7a583...",
+      "walletAddress": "0x8Fb7a5836f796Cc8B2aDe74686a8780b70a08945",
+      "success": false,
+      "error": "No matching user ID found",
+      "timestamp": "2025-10-25T16:30:10.968Z"
+    },
+    {
+      "userId": "0x78830EfD...",
+      "walletAddress": "0x78830EfDa881718E687eeB0929c69067924148a8",
+      "success": false,
+      "error": "No matching user ID found",
+      "timestamp": "2025-10-25T16:30:10.969Z"
+    },
+    {
+      "userId": "0x63d9aE5c...",
+      "walletAddress": "0x63d9aE5cfe0bEe16fdb72CDbd34fb695D1313316",
+      "success": false,
+      "error": "No matching user ID found",
+      "timestamp": "2025-10-25T16:30:10.970Z"
+    },
+    {
+      "userId": "...",
+      "walletAddress": "",
+      "success": false,
+      "error": "No matching user ID found",
+      "timestamp": "2025-10-25T16:30:10.970Z"
+    }
+  ],
+  "startTime": "2025-10-25T16:30:07.137Z",
+  "endTime": "2025-10-25T16:30:10.970Z"
+}

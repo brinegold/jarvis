@@ -24,16 +24,10 @@ export class OptimizedReferralService {
   private supabase = createSupabaseClient()
   
   private readonly commissionRates: ReferralCommissionRates[] = [
-    { level: 1, usdtRate: 15, jrcRate: 20 },
-    { level: 2, usdtRate: 10, jrcRate: 15 },
-    { level: 3, usdtRate: 5, jrcRate: 10 },
-    { level: 4, usdtRate: 3, jrcRate: 8 },
-    { level: 5, usdtRate: 2, jrcRate: 6 },
-    { level: 6, usdtRate: 1, jrcRate: 4 },
-    { level: 7, usdtRate: 0.5, jrcRate: 3 },
-    { level: 8, usdtRate: 0.2, jrcRate: 2 },
-    { level: 9, usdtRate: 0.1, jrcRate: 1.5 },
-    { level: 10, usdtRate: 0.05, jrcRate: 1 }
+    { level: 1, usdtRate: 5, jrcRate: 20 },
+    { level: 2, usdtRate: 3, jrcRate: 15 },
+    { level: 3, usdtRate: 2, jrcRate: 10 },
+    { level: 4, usdtRate: 1, jrcRate: 8 }
   ]
 
   /**
@@ -144,7 +138,7 @@ export class OptimizedReferralService {
       // Use a recursive CTE (Common Table Expression) to get the entire chain in one query
       const { data, error } = await this.supabase.rpc('get_referral_chain_recursive', {
         start_user_id: userId,
-        max_levels: 10
+        max_levels: 4
       })
 
       if (error) {
@@ -183,7 +177,7 @@ export class OptimizedReferralService {
     let currentUserId = userId
     let level = 1
 
-    while (level <= 10) {
+    while (level <= 4) {
       const currentProfile = profileById.get(currentUserId)
       if (!currentProfile?.sponsor_id) break
 

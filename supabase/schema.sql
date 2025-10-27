@@ -73,7 +73,7 @@ CREATE TABLE public.referrals (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     referrer_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     referred_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    level INTEGER NOT NULL CHECK (level >= 1 AND level <= 10),
+    level INTEGER NOT NULL CHECK (level >= 1 AND level <= 4),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(referrer_id, referred_id)
 );

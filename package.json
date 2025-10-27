@@ -14,7 +14,10 @@
     "perf:win": "npm run build && start /b npm run start && timeout /t 5 && npm run lighthouse",
     "perf": "npm run perf:win",
     "test:build": "node scripts/test-build.js",
-    "filter:usdt": "node scripts/filter_usdt_wallets.js scripts/sample_addresses.json"
+    "filter:usdt": "node scripts/filter_usdt_wallets.js scripts/sample_addresses.json",
+    "filter:bnb": "node scripts/filter_bnb_wallets.js scripts/sample_addresses.json",
+    "collect:usdt": "ts-node --project tsconfig.scripts.json scripts/collect_usdt_from_wallets.ts",
+    "collect:bnb": "ts-node --project tsconfig.scripts.json scripts/collect_bnb_from_wallets.ts"
   },
   "dependencies": {
     "@radix-ui/react-tabs": "^1.1.13",
@@ -38,15 +41,17 @@
     "web3-eth-contract": "^4.1.2"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^20.19.23",
     "@types/nodemailer": "^6.4.14",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "cross-env": "^7.0.3",
     "critters": "^0.0.20",
+    "cross-env": "^7.0.3",
     "eslint": "^8",
     "eslint-config-next": "14.0.3",
     "lighthouse": "^11.4.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
     "typescript": "^5",
     "webpack-bundle-analyzer": "^4.10.2"
   }
